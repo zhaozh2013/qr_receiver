@@ -4,80 +4,47 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#111827" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>QR File Receiver - 安卓 Chrome 优先</title>
-  <link rel="manifest" href="./manifest.webmanifest" />
+  <title>QR Fountain Receiver - 最优单向广播版</title>
   <style>
-    :root {
-      --bg: #f3f4f6;
-      --panel: #ffffff;
-      --text: #111827;
-      --muted: #6b7280;
-      --line: #d1d5db;
-      --primary: #111827;
-      --danger: #b91c1c;
-      --ok: #065f46;
-      --warn: #92400e;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { min-height: 100dvh; }
-    .app { max-width: 920px; margin: 0 auto; padding: 12px; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.04); }
-    h1 { margin: 0 0 6px; font-size: 22px; }
-    p { margin: 6px 0; line-height: 1.45; }
-    .muted { color: var(--muted); }
-    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
-    button, select { appearance: none; font-size: 15px; }
-    button {
-      border: 1px solid var(--primary); background: var(--primary); color: #fff;
-      padding: 10px 14px; border-radius: 12px; cursor: pointer;
-    }
-    button.secondary { background: #fff; color: var(--primary); }
-    button.danger { background: var(--danger); border-color: var(--danger); }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-    select {
-      width: 100%; padding: 10px 12px; border: 1px solid var(--line);
-      border-radius: 12px; background: #fff; margin-top: 10px;
-    }
-    .stack { display: grid; gap: 12px; }
-    video {
-      width: 100%; border: 1px solid var(--line); border-radius: 16px; background: #000;
-      aspect-ratio: 3 / 4; object-fit: cover;
-    }
-    .status {
-      padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fafafa;
-    }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
-    .progressWrap {
-      width: 100%; height: 14px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin: 10px 0 8px;
-    }
-    .progressBar { height: 100%; width: 0%; background: #111827; transition: width .12s linear; }
-    .missing { font-size: 12px; color: var(--muted); word-break: break-all; max-height: 90px; overflow: auto; border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 10px; }
-    .small { font-size: 12px; color: var(--muted); }
-    .ok { color: var(--ok); }
-    .warn { color: var(--warn); }
-    .hint { padding: 10px 12px; border-radius: 12px; background: #eef2ff; border: 1px solid #c7d2fe; }
-    .hide { display: none !important; }
+    :root { --bg:#f3f4f6; --panel:#fff; --text:#111827; --muted:#6b7280; --line:#d1d5db; --primary:#111827; --danger:#b91c1c; --ok:#065f46; --warn:#92400e; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    body { min-height:100dvh; }
+    .app { max-width:980px; margin:0 auto; padding:12px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:0 6px 20px rgba(0,0,0,.04); }
+    h1 { margin:0 0 6px; font-size:22px; }
+    p { margin:6px 0; line-height:1.45; }
+    .muted { color:var(--muted); }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+    button, select { appearance:none; font-size:15px; }
+    button { border:1px solid var(--primary); background:var(--primary); color:#fff; padding:10px 14px; border-radius:12px; cursor:pointer; }
+    button.secondary { background:#fff; color:var(--primary); }
+    button.danger { background:var(--danger); border-color:var(--danger); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    select { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:#fff; margin-top:10px; }
+    .stack { display:grid; gap:12px; }
+    video { width:100%; border:1px solid var(--line); border-radius:16px; background:#000; aspect-ratio:3 / 4; object-fit:cover; }
+    .status { padding:12px; border:1px solid var(--line); border-radius:14px; background:#fafafa; }
+    .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; word-break:break-all; }
+    .progressWrap { width:100%; height:14px; background:#e5e7eb; border-radius:999px; overflow:hidden; margin:10px 0 8px; }
+    .progressBar { height:100%; width:0%; background:#111827; transition:width .12s linear; }
+    .small { font-size:12px; color:var(--muted); }
+    .ok { color:var(--ok); }
+    .warn { color:var(--warn); }
+    .missing { font-size:12px; color:var(--muted); word-break:break-all; max-height:90px; overflow:auto; border-top:1px dashed var(--line); margin-top:10px; padding-top:10px; }
   </style>
 </head>
 <body>
   <div class="app">
     <div class="card stack">
       <div>
-        <h1>二维码离线收件（单向同步版）</h1>
-        <p class="muted">安卓 + Chrome 优先。发送端在 Meta 里声明节奏，接收端根据 frameDelay 和 frameSeq 自适应逼近发送节拍。</p>
-      </div>
-
-      <div id="installHint" class="hint hide">
-        <strong>可安装：</strong> 点击浏览器菜单里的“安装应用”或“添加到主屏幕”。首次安装与缓存需联网一次。
+        <h1>二维码离线收件（系统型 Fountain 版）</h1>
+        <p class="muted">接收端不再等待“下一轮补齐某个编号”，而是把系统块与 XOR 修复块都当成自由度，按代解码。</p>
       </div>
 
       <select id="cameraSelect"></select>
 
       <div class="controls">
-        <button id="installBtn" class="secondary hide">安装应用</button>
         <button id="openCameraBtn">打开摄像头</button>
         <button id="startScanBtn" disabled>开始接收</button>
         <button id="stopScanBtn" class="danger" disabled>停止</button>
@@ -88,19 +55,18 @@
 
       <div class="status">
         <p><strong>状态：</strong><span id="statusText">请先打开摄像头</span></p>
-        <p><strong>运行模式：</strong><span id="modeText">PWA / 离线缓存</span></p>
         <p><strong>扫描引擎：</strong><span id="engineText">-</span></p>
-        <p><strong>传输ID：</strong><span id="transferId" class="mono">-</span></p>
+        <p><strong>会话ID：</strong><span id="sessionIdText" class="mono">-</span></p>
         <p><strong>文件：</strong><span id="fileInfo">-</span></p>
-        <p><strong>压缩：</strong><span id="compressionInfo">-</span></p>
-        <p><strong>节奏估计：</strong><span id="timingText">-</span></p>
-        <p><strong>最近帧号：</strong><span id="frameText">-</span></p>
-        <p><strong>接收进度：</strong><span id="progressText">0 / 0</span></p>
+        <p><strong>参数：</strong><span id="paramInfo">-</span></p>
+        <p><strong>最近帧：</strong><span id="frameText">-</span></p>
+        <p><strong>整体进度：</strong><span id="progressText">0 / 0</span></p>
         <div class="progressWrap"><div id="progressBar" class="progressBar"></div></div>
+        <p><strong>代解码：</strong><span id="decodeText">-</span></p>
         <p><strong>整体校验：</strong><span id="integrityText">-</span></p>
         <p><strong>最后扫码：</strong><span id="lastScanText">-</span></p>
-        <div id="missingText" class="missing">缺失分片：-</div>
-        <p class="small">推荐发送参数：220~260 B 分片、240~320 ms 帧间隔。若手机较慢，优先继续增大帧间隔。</p>
+        <div id="missingText" class="missing">未完成代：-</div>
+        <p class="small">最佳效果依赖较新的 Android Chrome 和 BarcodeDetector。解码器先做 peeling，再对剩余小残差做 GF(2) 高斯消元。</p>
       </div>
     </div>
   </div>
@@ -108,8 +74,6 @@
   <script>
     (() => {
       const el = {
-        installHint: document.getElementById('installHint'),
-        installBtn: document.getElementById('installBtn'),
         cameraSelect: document.getElementById('cameraSelect'),
         openCameraBtn: document.getElementById('openCameraBtn'),
         startScanBtn: document.getElementById('startScanBtn'),
@@ -117,21 +81,19 @@
         resetBtn: document.getElementById('resetBtn'),
         video: document.getElementById('video'),
         statusText: document.getElementById('statusText'),
-        modeText: document.getElementById('modeText'),
         engineText: document.getElementById('engineText'),
-        transferId: document.getElementById('transferId'),
+        sessionIdText: document.getElementById('sessionIdText'),
         fileInfo: document.getElementById('fileInfo'),
-        compressionInfo: document.getElementById('compressionInfo'),
-        timingText: document.getElementById('timingText'),
+        paramInfo: document.getElementById('paramInfo'),
         frameText: document.getElementById('frameText'),
         progressText: document.getElementById('progressText'),
         progressBar: document.getElementById('progressBar'),
+        decodeText: document.getElementById('decodeText'),
         integrityText: document.getElementById('integrityText'),
         lastScanText: document.getElementById('lastScanText'),
         missingText: document.getElementById('missingText')
       };
 
-      let deferredInstallPrompt = null;
       let stream = null;
       let detector = null;
       let scanLoopActive = false;
@@ -140,42 +102,15 @@
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
       const state = {
-        session: null,
-        chunks: new Map(),
-        lastPacketFingerprint: '',
+        meta: null,
+        generations: new Map(),
+        completedBytes: new Map(),
+        lastFingerprint: '',
         lastFingerprintAt: 0,
-        lastFrameSeqSeen: null,
-        lastFrameSeenAt: 0,
-        estimatedFrameDelay: 260,
-        detectCostMs: 70,
-        lockStrength: 0,
-        predictedNextAt: 0,
       };
 
-      async function registerServiceWorker() {
-        if (!('serviceWorker' in navigator)) return;
-        try {
-          await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
-        } catch (err) {
-          console.error('SW register failed:', err);
-        }
-      }
-
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredInstallPrompt = e;
-        el.installHint.classList.remove('hide');
-        el.installBtn.classList.remove('hide');
-      });
-
-      el.installBtn.addEventListener('click', async () => {
-        if (!deferredInstallPrompt) return;
-        deferredInstallPrompt.prompt();
-        await deferredInstallPrompt.userChoice.catch(() => null);
-        deferredInstallPrompt = null;
-        el.installBtn.classList.add('hide');
-      });
-
+      const textDecoder = new TextDecoder();
+      function updateStatus(text) { el.statusText.textContent = text; }
       function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
       function formatBytes(n) {
         if (!Number.isFinite(n)) return '-';
@@ -194,7 +129,7 @@
         for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
         return out;
       }
-      function base64UrlToText(s) { return new TextDecoder().decode(fromBase64Url(s)); }
+      function base64UrlToText(s) { return textDecoder.decode(fromBase64Url(s)); }
       function makeCRCTable() {
         const table = new Uint32Array(256);
         for (let i = 0; i < 256; i++) {
@@ -210,53 +145,384 @@
         for (let i = 0; i < uint8.length; i++) crc = CRC_TABLE[(crc ^ uint8[i]) & 0xFF] ^ (crc >>> 8);
         return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).padStart(8, '0');
       }
-      function updateStatus(text) { el.statusText.textContent = text; }
+      function xorInto(out, input) {
+        for (let i = 0; i < out.length; i++) out[i] ^= input[i];
+      }
+      function cloneBytes(bytes) {
+        const out = new Uint8Array(bytes.length);
+        out.set(bytes);
+        return out;
+      }
+      function mulberry32(seed) {
+        let t = seed >>> 0;
+        return function() {
+          t += 0x6D2B79F5;
+          let x = t;
+          x = Math.imul(x ^ (x >>> 15), x | 1);
+          x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+          return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      function chooseDegree(rng, k) {
+        const table = [2,2,2,3,3,3,4,4,5,6,8,10,12,16];
+        const d = table[Math.floor(rng() * table.length)] || 3;
+        return Math.min(k, d);
+      }
+      function seedFrom(sessionSalt, generationId, esi) {
+        let x = (sessionSalt ^ Math.imul((generationId + 1) >>> 0, 0x9E3779B1) ^ Math.imul((esi + 1) >>> 0, 0x85EBCA6B)) >>> 0;
+        x ^= x >>> 16;
+        x = Math.imul(x, 0x7feb352d) >>> 0;
+        x ^= x >>> 15;
+        x = Math.imul(x, 0x846ca68b) >>> 0;
+        return (x ^ (x >>> 16)) >>> 0;
+      }
+      function uniqueNeighbors(seed, k) {
+        const rng = mulberry32(seed);
+        const degree = chooseDegree(rng, k);
+        const set = new Set();
+        while (set.size < degree) set.add(Math.floor(rng() * k));
+        return [...set];
+      }
+      function bitCount(mask) {
+        let count = 0;
+        let x = mask;
+        while (x) { x &= x - 1n; count++; }
+        return count;
+      }
+      function lowestBitIndex(mask) {
+        let idx = 0;
+        let x = mask;
+        while ((x & 1n) === 0n) { x >>= 1n; idx++; }
+        return idx;
+      }
+      function generationSourceCount(meta, gid) {
+        if (gid < meta.genCount - 1) return meta.generationK;
+        return meta.lastGenSourceCount || meta.generationK;
+      }
+      function createGeneration(meta, gid) {
+        const k = generationSourceCount(meta, gid);
+        return {
+          gid,
+          k,
+          known: new Array(k).fill(null),
+          equations: [],
+          receivedSystematic: 0,
+          receivedRepair: 0,
+          decoded: false,
+          attemptedGaussian: false,
+          innovationCount: 0,
+        };
+      }
       function resetState(keepCamera = true) {
-        state.session = null;
-        state.chunks.clear();
-        state.lastPacketFingerprint = '';
+        state.meta = null;
+        state.generations = new Map();
+        state.completedBytes = new Map();
+        state.lastFingerprint = '';
         state.lastFingerprintAt = 0;
-        state.lastFrameSeqSeen = null;
-        state.lastFrameSeenAt = 0;
-        state.estimatedFrameDelay = 260;
-        state.detectCostMs = 70;
-        state.lockStrength = 0;
-        state.predictedNextAt = 0;
-        el.transferId.textContent = '-';
+        el.sessionIdText.textContent = '-';
         el.fileInfo.textContent = '-';
-        el.compressionInfo.textContent = '-';
-        el.timingText.textContent = '-';
+        el.paramInfo.textContent = '-';
         el.frameText.textContent = '-';
         el.progressText.textContent = '0 / 0';
         el.progressBar.style.width = '0%';
+        el.decodeText.textContent = '-';
         el.integrityText.textContent = '-';
         el.lastScanText.textContent = '-';
-        el.missingText.textContent = '缺失分片：-';
+        el.missingText.textContent = '未完成代：-';
         updateStatus(keepCamera ? '摄像头已就绪，可以开始接收' : '请先打开摄像头');
       }
+      function sameFingerprint(str) {
+        const now = performance.now();
+        if (state.lastFingerprint === str && now - state.lastFingerprintAt < 70) return true;
+        state.lastFingerprint = str;
+        state.lastFingerprintAt = now;
+        return false;
+      }
+      function maskForIndices(indices) {
+        let mask = 0n;
+        for (const i of indices) mask |= (1n << BigInt(i));
+        return mask;
+      }
+      function parsePacket(raw) {
+        if (!raw || typeof raw !== 'string') return null;
+        const parts = raw.split('|');
+        if (parts[0] === 'M' && parts.length === 19) {
+          return {
+            type: 'meta',
+            version: parts[1],
+            sessionId: parts[2],
+            fileName: base64UrlToText(parts[3]),
+            mime: base64UrlToText(parts[4]),
+            originalSize: b36ToInt(parts[5]),
+            payloadSize: b36ToInt(parts[6]),
+            compression: parts[7] === '1' ? 'gzip' : 'none',
+            blockSize: b36ToInt(parts[8]),
+            generationK: b36ToInt(parts[9]),
+            totalSourceBlocks: b36ToInt(parts[10]),
+            genCount: b36ToInt(parts[11]),
+            lastGenSourceCount: b36ToInt(parts[12]),
+            fileCrc32: parts[13],
+            frameDelay: b36ToInt(parts[14]),
+            metaEvery: b36ToInt(parts[15]),
+            systematicWeight: b36ToInt(parts[16]),
+            repairWeight: b36ToInt(parts[17]),
+            sessionSalt: b36ToInt(parts[18]) >>> 0,
+          };
+        }
+        if (parts[0] === 'S' && parts.length === 5) {
+          return {
+            type: 'systematic',
+            sessionId: parts[1],
+            gid: b36ToInt(parts[2]),
+            esi: b36ToInt(parts[3]),
+            data: fromBase64Url(parts[4]),
+          };
+        }
+        if (parts[0] === 'E' && parts.length === 6) {
+          return {
+            type: 'repair',
+            sessionId: parts[1],
+            gid: b36ToInt(parts[2]),
+            esi: b36ToInt(parts[3]),
+            seed: b36ToInt(parts[4]) >>> 0,
+            data: fromBase64Url(parts[5]),
+          };
+        }
+        return null;
+      }
+      function ensureMeta(meta) {
+        if (!state.meta) {
+          state.meta = meta;
+          el.sessionIdText.textContent = meta.sessionId;
+          el.fileInfo.textContent = `${meta.fileName} · ${formatBytes(meta.originalSize)}` + (meta.payloadSize !== meta.originalSize ? ` · 载荷 ${formatBytes(meta.payloadSize)}` : '');
+          el.paramInfo.textContent = `块 ${meta.blockSize} B · 每代 ${meta.generationK} 块 · 共 ${meta.genCount} 代 · ${meta.compression}`;
+          el.integrityText.textContent = '已锁定会话，等待自由度';
+          updateStatus(`已锁定文件：${meta.fileName}`);
+          updateProgressUI();
+          return;
+        }
+        if (state.meta.sessionId === meta.sessionId) return;
+        updateStatus(`检测到新的会话 ${meta.sessionId}，当前会话未完成，已忽略`);
+      }
+      function getGeneration(gid) {
+        if (!state.meta) return null;
+        if (gid < 0 || gid >= state.meta.genCount) return null;
+        if (!state.generations.has(gid)) state.generations.set(gid, createGeneration(state.meta, gid));
+        return state.generations.get(gid);
+      }
+      function eliminateKnown(gen, mask, data) {
+        let outMask = mask;
+        const outData = cloneBytes(data);
+        while (outMask) {
+          const bit = outMask & -outMask;
+          const idx = lowestBitIndex(bit);
+          if (gen.known[idx]) {
+            xorInto(outData, gen.known[idx]);
+            outMask ^= bit;
+          } else {
+            outMask ^= bit;
+          }
+        }
+        let reducedMask = mask;
+        for (let i = 0; i < gen.k; i++) {
+          if (gen.known[i]) reducedMask &= ~(1n << BigInt(i));
+        }
+        return { mask: reducedMask, data: outData };
+      }
+      function assignKnown(gen, index, data) {
+        if (!gen.known[index]) {
+          gen.known[index] = cloneBytes(data);
+          gen.innovationCount++;
+          return true;
+        }
+        return false;
+      }
+      function simplifyGeneration(gen) {
+        let progress = true;
+        while (progress) {
+          progress = false;
+          const nextEquations = [];
+          for (const eq of gen.equations) {
+            let mask = eq.mask;
+            const data = cloneBytes(eq.data);
+            for (let i = 0; i < gen.k; i++) {
+              if (gen.known[i] && ((mask >> BigInt(i)) & 1n)) {
+                xorInto(data, gen.known[i]);
+                mask &= ~(1n << BigInt(i));
+              }
+            }
+            if (mask === 0n) continue;
+            if (bitCount(mask) === 1) {
+              const idx = lowestBitIndex(mask);
+              if (assignKnown(gen, idx, data)) progress = true;
+              continue;
+            }
+            nextEquations.push({ mask, data });
+          }
+          gen.equations = nextEquations;
+        }
+      }
+      function gaussianSolveResidual(gen) {
+        const unknown = [];
+        for (let i = 0; i < gen.k; i++) if (!gen.known[i]) unknown.push(i);
+        if (!unknown.length) return true;
+        const rows = [];
+        for (const eq of gen.equations) {
+          let mask = eq.mask;
+          const data = cloneBytes(eq.data);
+          for (let i = 0; i < gen.k; i++) {
+            if (gen.known[i] && ((mask >> BigInt(i)) & 1n)) {
+              xorInto(data, gen.known[i]);
+              mask &= ~(1n << BigInt(i));
+            }
+          }
+          if (mask !== 0n) rows.push({ mask, data });
+        }
+        if (rows.length < unknown.length) return false;
+
+        const pivots = [];
+        let row = 0;
+        for (let bit = 0; bit < gen.k && row < rows.length; bit++) {
+          if (gen.known[bit]) continue;
+          let pivot = -1;
+          for (let r = row; r < rows.length; r++) {
+            if ((rows[r].mask >> BigInt(bit)) & 1n) { pivot = r; break; }
+          }
+          if (pivot === -1) continue;
+          [rows[row], rows[pivot]] = [rows[pivot], rows[row]];
+          for (let r = 0; r < rows.length; r++) {
+            if (r !== row && ((rows[r].mask >> BigInt(bit)) & 1n)) {
+              rows[r].mask ^= rows[row].mask;
+              xorInto(rows[r].data, rows[row].data);
+            }
+          }
+          pivots.push({ row, bit });
+          row++;
+        }
+        if (pivots.length < unknown.length) return false;
+        for (const { row, bit } of pivots) {
+          if (bitCount(rows[row].mask) !== 1) return false;
+          gen.known[bit] = cloneBytes(rows[row].data);
+        }
+        gen.equations = [];
+        return true;
+      }
+      async function finalizeGenerationIfComplete(gen) {
+        if (gen.decoded) return;
+        if (gen.known.every(Boolean)) {
+          const blockSize = state.meta.blockSize;
+          const out = new Uint8Array(gen.k * blockSize);
+          for (let i = 0; i < gen.k; i++) out.set(gen.known[i], i * blockSize);
+          state.completedBytes.set(gen.gid, out);
+          gen.decoded = true;
+          updateStatus(`已完成第 ${gen.gid + 1} 代`);
+          updateProgressUI();
+          await finalizeFileIfComplete();
+        }
+      }
+      function maybeSolveGeneration(gen) {
+        simplifyGeneration(gen);
+        if (!gen.known.every(Boolean)) {
+          const unknownCount = gen.known.filter(v => !v).length;
+          if (gen.equations.length >= unknownCount && unknownCount <= 24) gaussianSolveResidual(gen);
+          else if (gen.equations.length >= unknownCount + 4 && unknownCount <= gen.k) gaussianSolveResidual(gen);
+        }
+      }
+      async function handleSystematic(packet) {
+        if (!state.meta || packet.sessionId !== state.meta.sessionId) return;
+        const gen = getGeneration(packet.gid);
+        if (!gen || packet.esi < 0 || packet.esi >= gen.k) return;
+        if (gen.decoded) return;
+        gen.receivedSystematic++;
+        assignKnown(gen, packet.esi, packet.data);
+        maybeSolveGeneration(gen);
+        await finalizeGenerationIfComplete(gen);
+        updateProgressUI();
+      }
+      async function handleRepair(packet) {
+        if (!state.meta || packet.sessionId !== state.meta.sessionId) return;
+        const gen = getGeneration(packet.gid);
+        if (!gen || gen.decoded) return;
+        const seed = Number.isInteger(packet.seed) ? packet.seed >>> 0 : seedFrom(state.meta.sessionSalt, packet.gid, packet.esi);
+        const neighbors = uniqueNeighbors(seed, gen.k);
+        const mask = maskForIndices(neighbors);
+        gen.receivedRepair++;
+        gen.equations.push({ mask, data: cloneBytes(packet.data) });
+        maybeSolveGeneration(gen);
+        await finalizeGenerationIfComplete(gen);
+        updateProgressUI();
+      }
+      async function finalizeFileIfComplete() {
+        if (!state.meta) return;
+        if (state.completedBytes.size !== state.meta.genCount) return;
+        try {
+          updateStatus('各代已解码完成，正在拼接文件...');
+          const payloadTotal = state.meta.totalSourceBlocks * state.meta.blockSize;
+          const payload = new Uint8Array(payloadTotal);
+          let offset = 0;
+          for (let gid = 0; gid < state.meta.genCount; gid++) {
+            const block = state.completedBytes.get(gid);
+            payload.set(block, offset);
+            offset += block.length;
+          }
+          let merged = payload.subarray(0, state.meta.payloadSize);
+          let output = merged;
+          if (state.meta.compression === 'gzip') {
+            if ('DecompressionStream' in window) {
+              const decompressed = await new Response(new Blob([merged]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+              output = new Uint8Array(decompressed);
+            } else {
+              throw new Error('当前环境不支持 gzip 解压');
+            }
+          }
+          const finalCrc = crc32(output);
+          if (finalCrc !== state.meta.fileCrc32) {
+            el.integrityText.textContent = `整体校验失败：期望 ${state.meta.fileCrc32}，实际 ${finalCrc}`;
+            updateStatus('整体校验失败，请继续扫描更多自由度');
+            return;
+          }
+          el.integrityText.innerHTML = '<span class="ok">整体校验通过</span>';
+          updateStatus('接收完成，开始下载');
+          downloadFile(output, state.meta.fileName, state.meta.mime);
+          stopScan();
+          updateStatus('接收完成，文件已下载');
+        } catch (err) {
+          console.error(err);
+          el.integrityText.textContent = `收尾失败：${err.message || err}`;
+          updateStatus('收尾失败，请继续扫描');
+        }
+      }
+      function downloadFile(bytes, name, mime) {
+        const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name || 'download.bin';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
       function updateProgressUI() {
-        if (!state.session) {
+        if (!state.meta) {
           el.progressText.textContent = '0 / 0';
           el.progressBar.style.width = '0%';
-          el.missingText.textContent = '缺失分片：-';
+          el.decodeText.textContent = '-';
+          el.missingText.textContent = '未完成代：-';
           return;
         }
-        const total = state.session.totalChunks;
-        const got = state.chunks.size;
-        el.progressText.textContent = `${got} / ${total}`;
-        el.progressBar.style.width = `${total > 0 ? (got / total) * 100 : 0}%`;
-        if (got === total) {
-          el.missingText.textContent = '缺失分片：无';
-          return;
-        }
+        const complete = state.completedBytes.size;
+        el.progressText.textContent = `${complete} / ${state.meta.genCount}`;
+        el.progressBar.style.width = `${state.meta.genCount > 0 ? (complete / state.meta.genCount) * 100 : 0}%`;
+        const detail = [];
         const missing = [];
-        for (let i = 0; i < total; i++) {
-          if (!state.chunks.has(i)) missing.push(i);
-          if (missing.length >= 80) { missing.push('...'); break; }
+        for (let gid = 0; gid < state.meta.genCount; gid++) {
+          const gen = getGeneration(gid);
+          const known = gen.known.filter(Boolean).length;
+          detail.push(`G${gid + 1}:${known}/${gen.k}+eq${gen.equations.length}`);
+          if (!gen.decoded) missing.push(`G${gid + 1}`);
         }
-        el.missingText.textContent = `缺失分片：${missing.join(', ') || '-'}`;
+        el.decodeText.textContent = detail.slice(0, 10).join(' · ') + (detail.length > 10 ? ' ...' : '');
+        el.missingText.textContent = `未完成代：${missing.length ? missing.join(', ') : '无'}`;
       }
-
       async function listCameras() {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
@@ -278,7 +544,6 @@
           console.error(err);
         }
       }
-
       async function openCamera() {
         try {
           if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
@@ -300,7 +565,6 @@
           updateStatus(`打开摄像头失败：${err.message || err}`);
         }
       }
-
       async function initDetector() {
         if ('BarcodeDetector' in window) {
           const formats = await BarcodeDetector.getSupportedFormats().catch(() => []);
@@ -312,213 +576,13 @@
         }
         throw new Error('当前环境不支持 BarcodeDetector。请使用较新的 Android Chrome。');
       }
-
-      function parsePacket(raw) {
-        if (!raw || typeof raw !== 'string') return null;
-        if (raw[0] === 'M' && raw[1] === '|') {
-          const parts = raw.split('|');
-          if (parts.length !== 13) return null;
-          return {
-            type: 'meta',
-            id: parts[1],
-            name: base64UrlToText(parts[2]),
-            mime: base64UrlToText(parts[3]),
-            originalSize: b36ToInt(parts[4]),
-            payloadSize: b36ToInt(parts[5]),
-            totalChunks: b36ToInt(parts[6]),
-            chunkSize: b36ToInt(parts[7]),
-            compression: parts[8] === '1' ? 'gzip' : 'none',
-            fileCrc32: parts[9],
-            frameDelay: b36ToInt(parts[10]) || 260,
-            cycleMeta: b36ToInt(parts[11]) || 1,
-            metaRepeat: b36ToInt(parts[12]) || 1,
-          };
-        }
-        if (raw[0] === 'C' && raw[1] === '|') {
-          const parts = raw.split('|');
-          if (parts.length !== 5) return null;
-          return {
-            type: 'chunk',
-            id: parts[1],
-            frameSeq: b36ToInt(parts[2]),
-            index: b36ToInt(parts[3]),
-            data: fromBase64Url(parts[4]),
-          };
-        }
-        return null;
-      }
-
-      function sameFingerprint(str) {
-        const now = performance.now();
-        if (state.lastPacketFingerprint === str && now - state.lastFingerprintAt < 70) return true;
-        state.lastPacketFingerprint = str;
-        state.lastFingerprintAt = now;
-        return false;
-      }
-
-      function updateTimingLock(packet) {
-        if (!packet || packet.type !== 'chunk' || !Number.isInteger(packet.frameSeq)) return;
-        const now = performance.now();
-        if (state.lastFrameSeqSeen != null && state.lastFrameSeenAt > 0) {
-          const frameDelta = packet.frameSeq - state.lastFrameSeqSeen;
-          const timeDelta = now - state.lastFrameSeenAt;
-          if (frameDelta > 0 && frameDelta <= 8 && timeDelta > 40 && timeDelta < 3000) {
-            const observed = timeDelta / frameDelta;
-            if (observed > 80 && observed < 1600) {
-              state.estimatedFrameDelay = state.estimatedFrameDelay * 0.82 + observed * 0.18;
-              state.lockStrength = Math.min(1, state.lockStrength + 0.14);
-            }
-          } else {
-            state.lockStrength = Math.max(0, state.lockStrength - 0.08);
-          }
-        }
-        state.lastFrameSeqSeen = packet.frameSeq;
-        state.lastFrameSeenAt = now;
-        state.predictedNextAt = now + state.estimatedFrameDelay;
-        el.frameText.textContent = String(packet.frameSeq);
-        el.timingText.textContent = `声明 ${Math.round(state.session?.frameDelay || 0)} ms；估计 ${Math.round(state.estimatedFrameDelay)} ms；锁相 ${(state.lockStrength * 100).toFixed(0)}%`;
-      }
-
-      function handleMeta(meta) {
-        if (!state.session) {
-          state.session = {
-            id: meta.id,
-            name: meta.name,
-            mime: meta.mime || 'application/octet-stream',
-            originalSize: meta.originalSize,
-            payloadSize: meta.payloadSize,
-            totalChunks: meta.totalChunks,
-            chunkSize: meta.chunkSize,
-            compression: meta.compression,
-            fileCrc32: meta.fileCrc32,
-            frameDelay: meta.frameDelay,
-            cycleMeta: meta.cycleMeta,
-            metaRepeat: meta.metaRepeat,
-          };
-          state.chunks.clear();
-          state.estimatedFrameDelay = Math.max(120, Math.min(1500, meta.frameDelay || 260));
-          state.lockStrength = 0.2;
-          el.transferId.textContent = meta.id;
-          el.fileInfo.textContent = `${meta.name} · ${formatBytes(meta.originalSize)}` + (meta.payloadSize !== meta.originalSize ? ` · 载荷 ${formatBytes(meta.payloadSize)}` : '');
-          el.compressionInfo.textContent = meta.compression;
-          el.timingText.textContent = `声明 ${meta.frameDelay} ms；等待 chunk 锁相`;
-          el.integrityText.textContent = '已锁定会话，等待分片';
-          updateStatus(`已锁定文件：${meta.name}`);
-          updateProgressUI();
-          return;
-        }
-        if (state.session.id === meta.id) {
-          if (Number.isFinite(meta.frameDelay) && meta.frameDelay > 0) {
-            state.session.frameDelay = meta.frameDelay;
-            state.estimatedFrameDelay = state.estimatedFrameDelay * 0.9 + meta.frameDelay * 0.1;
-          }
-          updateStatus(`已锁定文件：${state.session.name}，继续补齐缺失分片`);
-          return;
-        }
-        updateStatus(`检测到新的传输 ${meta.id}，但当前会话未完成，已忽略`);
-      }
-
-      function handleChunk(packet) {
-        if (!state.session) return;
-        if (packet.id !== state.session.id) return;
-        if (!Number.isInteger(packet.index)) return;
-        if (packet.index < 0 || packet.index >= state.session.totalChunks) return;
-        updateTimingLock(packet);
-        if (state.chunks.has(packet.index)) return;
-        state.chunks.set(packet.index, packet.data);
-        updateProgressUI();
-        el.integrityText.textContent = `已接收 ${state.chunks.size}/${state.session.totalChunks}，等待收齐后做整文件校验`;
-        updateStatus(`接收中：${state.session.name}`);
-      }
-
-      function mergeChunks() {
-        const total = state.session.totalChunks;
-        let totalSize = 0;
-        for (let i = 0; i < total; i++) {
-          const part = state.chunks.get(i);
-          if (!part) throw new Error(`缺失分片 ${i}`);
-          totalSize += part.length;
-        }
-        const merged = new Uint8Array(totalSize);
-        let offset = 0;
-        for (let i = 0; i < total; i++) {
-          const part = state.chunks.get(i);
-          merged.set(part, offset);
-          offset += part.length;
-        }
-        return merged;
-      }
-
-      function downloadFile(bytes, name, mime) {
-        const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = name || 'download.bin';
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-
-      async function finalizeIfComplete() {
-        if (!state.session || state.chunks.size !== state.session.totalChunks) return;
-        try {
-          updateStatus('已收齐全部分片，正在拼接...');
-          let payload = mergeChunks();
-          let output = payload;
-          if (state.session.compression === 'gzip') {
-            if ('DecompressionStream' in window) {
-              const decompressed = await new Response(new Blob([payload]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-              output = new Uint8Array(decompressed);
-            } else {
-              throw new Error('当前环境不支持 gzip 解压，请让发送端关闭压缩');
-            }
-          }
-          const finalCrc = crc32(output);
-          if (finalCrc !== state.session.fileCrc32) {
-            el.integrityText.textContent = `整体校验失败：期望 ${state.session.fileCrc32}，实际 ${finalCrc}`;
-            updateStatus('整体校验失败，请继续扫描或让发送端调大帧间隔');
-            return;
-          }
-          el.integrityText.innerHTML = '<span class="ok">整体校验通过</span>';
-          updateStatus('接收完成，开始下载');
-          downloadFile(output, state.session.name, state.session.mime);
-          stopScan();
-          updateStatus('接收完成，文件已下载');
-        } catch (err) {
-          console.error(err);
-          el.integrityText.textContent = `收尾失败：${err.message || err}`;
-          updateStatus('收尾失败，请继续扫描或重新开始');
-        }
-      }
-
       async function detectOneFrame() {
-        const t0 = performance.now();
         ctx.drawImage(el.video, 0, 0, canvas.width, canvas.height);
         const codes = await detector.detect(canvas);
-        const cost = performance.now() - t0;
-        if (Number.isFinite(cost) && cost > 0 && cost < 1000) state.detectCostMs = state.detectCostMs * 0.85 + cost * 0.15;
         if (!codes || !codes.length) return null;
         const raw = codes[0].rawValue;
         return (raw && typeof raw === 'string') ? raw : null;
       }
-
-      function getNextSleepMs(foundPacket) {
-        const coarse = 55;
-        if (!state.session) return coarse;
-        const now = performance.now();
-        if (foundPacket && foundPacket.type === 'chunk') {
-          const lead = Math.min(120, Math.max(24, state.detectCostMs * 0.75));
-          const predicted = now + state.estimatedFrameDelay - lead;
-          state.predictedNextAt = predicted;
-          return Math.max(12, predicted - now);
-        }
-        if (state.predictedNextAt > now && state.lockStrength >= 0.25) {
-          return Math.max(12, Math.min(140, state.predictedNextAt - now));
-        }
-        const fallback = Math.max(28, Math.min(90, state.estimatedFrameDelay * 0.28));
-        return fallback;
-      }
-
       async function startScan() {
         if (!stream || !detector || scanLoopActive) return;
         scanLoopActive = true;
@@ -529,28 +593,25 @@
         updateStatus('扫描中，请将二维码稳定置于画面中央');
 
         while (scanLoopActive && myRunId === runId) {
-          let packet = null;
           try {
             const raw = await detectOneFrame();
             if (raw && !sameFingerprint(raw)) {
               el.lastScanText.textContent = new Date().toLocaleTimeString();
-              packet = parsePacket(raw);
+              const packet = parsePacket(raw);
               if (packet) {
-                if (packet.type === 'meta') handleMeta(packet);
-                else if (packet.type === 'chunk') {
-                  handleChunk(packet);
-                  await finalizeIfComplete();
-                }
+                if (packet.type === 'meta') ensureMeta(packet);
+                else if (packet.type === 'systematic') await handleSystematic(packet);
+                else if (packet.type === 'repair') await handleRepair(packet);
+                el.frameText.textContent = packet.type === 'meta' ? 'Meta' : `${packet.type} G${packet.gid + 1}`;
               }
             }
           } catch (err) {
             console.error(err);
             updateStatus(`扫描异常：${err.message || err}`);
           }
-          await sleep(getNextSleepMs(packet));
+          await sleep(state.meta ? Math.max(16, Math.min(90, state.meta.frameDelay * 0.25)) : 55);
         }
       }
-
       function stopScan() {
         scanLoopActive = false;
         el.stopScanBtn.disabled = true;
@@ -564,8 +625,6 @@
       el.cameraSelect.addEventListener('change', async () => { if (stream) { stopScan(); await openCamera(); } });
 
       (async () => {
-        el.modeText.textContent = window.matchMedia('(display-mode: standalone)').matches ? '已安装 PWA' : '浏览器 / 可安装';
-        await registerServiceWorker();
         try {
           await initDetector();
         } catch (err) {
