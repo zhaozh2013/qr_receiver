@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>QR File Receiver</title>
+  <title>QR File Receiver - 安卓 Chrome 优先</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <style>
     :root {
@@ -23,7 +23,7 @@
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     body { min-height: 100dvh; }
-    .app { max-width: 900px; margin: 0 auto; padding: 12px; }
+    .app { max-width: 920px; margin: 0 auto; padding: 12px; }
     .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.04); }
     h1 { margin: 0 0 6px; font-size: 22px; }
     p { margin: 6px 0; line-height: 1.45; }
@@ -66,8 +66,8 @@
   <div class="app">
     <div class="card stack">
       <div>
-        <h1>二维码离线收件</h1>
-        <p class="muted">安卓 + Chrome PWA。仅保留接收功能。首次联网安装后，可离线打开并扫描发送端二维码。</p>
+        <h1>二维码离线收件（单向同步版）</h1>
+        <p class="muted">安卓 + Chrome 优先。发送端在 Meta 里声明节奏，接收端根据 frameDelay 和 frameSeq 自适应逼近发送节拍。</p>
       </div>
 
       <div id="installHint" class="hint hide">
@@ -93,12 +93,14 @@
         <p><strong>传输ID：</strong><span id="transferId" class="mono">-</span></p>
         <p><strong>文件：</strong><span id="fileInfo">-</span></p>
         <p><strong>压缩：</strong><span id="compressionInfo">-</span></p>
+        <p><strong>节奏估计：</strong><span id="timingText">-</span></p>
+        <p><strong>最近帧号：</strong><span id="frameText">-</span></p>
         <p><strong>接收进度：</strong><span id="progressText">0 / 0</span></p>
         <div class="progressWrap"><div id="progressBar" class="progressBar"></div></div>
         <p><strong>整体校验：</strong><span id="integrityText">-</span></p>
         <p><strong>最后扫码：</strong><span id="lastScanText">-</span></p>
         <div id="missingText" class="missing">缺失分片：-</div>
-        <p class="small">建议发件端从 200~240 字节分片、220~320ms 帧间隔开始测试。识别率不足时优先增大帧间隔。</p>
+        <p class="small">推荐发送参数：220~260 B 分片、240~320 ms 帧间隔。若手机较慢，优先继续增大帧间隔。</p>
       </div>
     </div>
   </div>
@@ -120,11 +122,13 @@
         transferId: document.getElementById('transferId'),
         fileInfo: document.getElementById('fileInfo'),
         compressionInfo: document.getElementById('compressionInfo'),
+        timingText: document.getElementById('timingText'),
+        frameText: document.getElementById('frameText'),
         progressText: document.getElementById('progressText'),
         progressBar: document.getElementById('progressBar'),
         integrityText: document.getElementById('integrityText'),
         lastScanText: document.getElementById('lastScanText'),
-        missingText: document.getElementById('missingText'),
+        missingText: document.getElementById('missingText')
       };
 
       let deferredInstallPrompt = null;
@@ -139,7 +143,13 @@
         session: null,
         chunks: new Map(),
         lastPacketFingerprint: '',
-        lastScanAt: 0,
+        lastFingerprintAt: 0,
+        lastFrameSeqSeen: null,
+        lastFrameSeenAt: 0,
+        estimatedFrameDelay: 260,
+        detectCostMs: 70,
+        lockStrength: 0,
+        predictedNextAt: 0,
       };
 
       async function registerServiceWorker() {
@@ -169,7 +179,9 @@
       function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
       function formatBytes(n) {
         if (!Number.isFinite(n)) return '-';
-        const units = ['B', 'KB', 'MB', 'GB']; let i = 0; let value = n;
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let i = 0;
+        let value = n;
         while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
         return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
       }
@@ -200,20 +212,43 @@
       }
       function updateStatus(text) { el.statusText.textContent = text; }
       function resetState(keepCamera = true) {
-        state.session = null; state.chunks.clear(); state.lastPacketFingerprint = ''; state.lastScanAt = 0;
-        el.transferId.textContent = '-'; el.fileInfo.textContent = '-'; el.compressionInfo.textContent = '-';
-        el.progressText.textContent = '0 / 0'; el.progressBar.style.width = '0%'; el.integrityText.textContent = '-';
-        el.lastScanText.textContent = '-'; el.missingText.textContent = '缺失分片：-';
+        state.session = null;
+        state.chunks.clear();
+        state.lastPacketFingerprint = '';
+        state.lastFingerprintAt = 0;
+        state.lastFrameSeqSeen = null;
+        state.lastFrameSeenAt = 0;
+        state.estimatedFrameDelay = 260;
+        state.detectCostMs = 70;
+        state.lockStrength = 0;
+        state.predictedNextAt = 0;
+        el.transferId.textContent = '-';
+        el.fileInfo.textContent = '-';
+        el.compressionInfo.textContent = '-';
+        el.timingText.textContent = '-';
+        el.frameText.textContent = '-';
+        el.progressText.textContent = '0 / 0';
+        el.progressBar.style.width = '0%';
+        el.integrityText.textContent = '-';
+        el.lastScanText.textContent = '-';
+        el.missingText.textContent = '缺失分片：-';
         updateStatus(keepCamera ? '摄像头已就绪，可以开始接收' : '请先打开摄像头');
       }
       function updateProgressUI() {
         if (!state.session) {
-          el.progressText.textContent = '0 / 0'; el.progressBar.style.width = '0%'; el.missingText.textContent = '缺失分片：-'; return;
+          el.progressText.textContent = '0 / 0';
+          el.progressBar.style.width = '0%';
+          el.missingText.textContent = '缺失分片：-';
+          return;
         }
-        const total = state.session.totalChunks, got = state.chunks.size;
+        const total = state.session.totalChunks;
+        const got = state.chunks.size;
         el.progressText.textContent = `${got} / ${total}`;
         el.progressBar.style.width = `${total > 0 ? (got / total) * 100 : 0}%`;
-        if (got === total) { el.missingText.textContent = '缺失分片：无'; return; }
+        if (got === total) {
+          el.missingText.textContent = '缺失分片：无';
+          return;
+        }
         const missing = [];
         for (let i = 0; i < total; i++) {
           if (!state.chunks.has(i)) missing.push(i);
@@ -239,7 +274,9 @@
             opt.textContent = '未发现摄像头';
             el.cameraSelect.appendChild(opt);
           }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+          console.error(err);
+        }
       }
 
       async function openCamera() {
@@ -252,7 +289,7 @@
           });
           el.video.srcObject = stream;
           await el.video.play();
-          await sleep(300);
+          await sleep(250);
           canvas.width = el.video.videoWidth || 1280;
           canvas.height = el.video.videoHeight || 720;
           resetState(true);
@@ -280,7 +317,7 @@
         if (!raw || typeof raw !== 'string') return null;
         if (raw[0] === 'M' && raw[1] === '|') {
           const parts = raw.split('|');
-          if (parts.length !== 10) return null;
+          if (parts.length !== 13) return null;
           return {
             type: 'meta',
             id: parts[1],
@@ -292,18 +329,20 @@
             chunkSize: b36ToInt(parts[7]),
             compression: parts[8] === '1' ? 'gzip' : 'none',
             fileCrc32: parts[9],
+            frameDelay: b36ToInt(parts[10]) || 260,
+            cycleMeta: b36ToInt(parts[11]) || 1,
+            metaRepeat: b36ToInt(parts[12]) || 1,
           };
         }
         if (raw[0] === 'C' && raw[1] === '|') {
-          const p1 = raw.indexOf('|');
-          const p2 = raw.indexOf('|', p1 + 1);
-          const p3 = raw.indexOf('|', p2 + 1);
-          if (p1 < 0 || p2 < 0 || p3 < 0) return null;
+          const parts = raw.split('|');
+          if (parts.length !== 5) return null;
           return {
             type: 'chunk',
-            id: raw.slice(p1 + 1, p2),
-            index: b36ToInt(raw.slice(p2 + 1, p3)),
-            data: fromBase64Url(raw.slice(p3 + 1)),
+            id: parts[1],
+            frameSeq: b36ToInt(parts[2]),
+            index: b36ToInt(parts[3]),
+            data: fromBase64Url(parts[4]),
           };
         }
         return null;
@@ -311,27 +350,68 @@
 
       function sameFingerprint(str) {
         const now = performance.now();
-        if (state.lastPacketFingerprint === str && now - state.lastScanAt < 120) return true;
-        state.lastPacketFingerprint = str; state.lastScanAt = now; return false;
+        if (state.lastPacketFingerprint === str && now - state.lastFingerprintAt < 70) return true;
+        state.lastPacketFingerprint = str;
+        state.lastFingerprintAt = now;
+        return false;
+      }
+
+      function updateTimingLock(packet) {
+        if (!packet || packet.type !== 'chunk' || !Number.isInteger(packet.frameSeq)) return;
+        const now = performance.now();
+        if (state.lastFrameSeqSeen != null && state.lastFrameSeenAt > 0) {
+          const frameDelta = packet.frameSeq - state.lastFrameSeqSeen;
+          const timeDelta = now - state.lastFrameSeenAt;
+          if (frameDelta > 0 && frameDelta <= 8 && timeDelta > 40 && timeDelta < 3000) {
+            const observed = timeDelta / frameDelta;
+            if (observed > 80 && observed < 1600) {
+              state.estimatedFrameDelay = state.estimatedFrameDelay * 0.82 + observed * 0.18;
+              state.lockStrength = Math.min(1, state.lockStrength + 0.14);
+            }
+          } else {
+            state.lockStrength = Math.max(0, state.lockStrength - 0.08);
+          }
+        }
+        state.lastFrameSeqSeen = packet.frameSeq;
+        state.lastFrameSeenAt = now;
+        state.predictedNextAt = now + state.estimatedFrameDelay;
+        el.frameText.textContent = String(packet.frameSeq);
+        el.timingText.textContent = `声明 ${Math.round(state.session?.frameDelay || 0)} ms；估计 ${Math.round(state.estimatedFrameDelay)} ms；锁相 ${(state.lockStrength * 100).toFixed(0)}%`;
       }
 
       function handleMeta(meta) {
         if (!state.session) {
           state.session = {
-            id: meta.id, name: meta.name, mime: meta.mime || 'application/octet-stream',
-            originalSize: meta.originalSize, payloadSize: meta.payloadSize, totalChunks: meta.totalChunks,
-            chunkSize: meta.chunkSize, compression: meta.compression, fileCrc32: meta.fileCrc32,
+            id: meta.id,
+            name: meta.name,
+            mime: meta.mime || 'application/octet-stream',
+            originalSize: meta.originalSize,
+            payloadSize: meta.payloadSize,
+            totalChunks: meta.totalChunks,
+            chunkSize: meta.chunkSize,
+            compression: meta.compression,
+            fileCrc32: meta.fileCrc32,
+            frameDelay: meta.frameDelay,
+            cycleMeta: meta.cycleMeta,
+            metaRepeat: meta.metaRepeat,
           };
           state.chunks.clear();
+          state.estimatedFrameDelay = Math.max(120, Math.min(1500, meta.frameDelay || 260));
+          state.lockStrength = 0.2;
           el.transferId.textContent = meta.id;
           el.fileInfo.textContent = `${meta.name} · ${formatBytes(meta.originalSize)}` + (meta.payloadSize !== meta.originalSize ? ` · 载荷 ${formatBytes(meta.payloadSize)}` : '');
           el.compressionInfo.textContent = meta.compression;
+          el.timingText.textContent = `声明 ${meta.frameDelay} ms；等待 chunk 锁相`;
           el.integrityText.textContent = '已锁定会话，等待分片';
           updateStatus(`已锁定文件：${meta.name}`);
           updateProgressUI();
           return;
         }
         if (state.session.id === meta.id) {
+          if (Number.isFinite(meta.frameDelay) && meta.frameDelay > 0) {
+            state.session.frameDelay = meta.frameDelay;
+            state.estimatedFrameDelay = state.estimatedFrameDelay * 0.9 + meta.frameDelay * 0.1;
+          }
           updateStatus(`已锁定文件：${state.session.name}，继续补齐缺失分片`);
           return;
         }
@@ -343,6 +423,7 @@
         if (packet.id !== state.session.id) return;
         if (!Number.isInteger(packet.index)) return;
         if (packet.index < 0 || packet.index >= state.session.totalChunks) return;
+        updateTimingLock(packet);
         if (state.chunks.has(packet.index)) return;
         state.chunks.set(packet.index, packet.data);
         updateProgressUI();
@@ -372,7 +453,9 @@
         const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = name || 'download.bin'; a.click();
+        a.href = url;
+        a.download = name || 'download.bin';
+        a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
@@ -409,38 +492,70 @@
       }
 
       async function detectOneFrame() {
+        const t0 = performance.now();
         ctx.drawImage(el.video, 0, 0, canvas.width, canvas.height);
         const codes = await detector.detect(canvas);
+        const cost = performance.now() - t0;
+        if (Number.isFinite(cost) && cost > 0 && cost < 1000) state.detectCostMs = state.detectCostMs * 0.85 + cost * 0.15;
         if (!codes || !codes.length) return null;
         const raw = codes[0].rawValue;
         return (raw && typeof raw === 'string') ? raw : null;
       }
 
+      function getNextSleepMs(foundPacket) {
+        const coarse = 55;
+        if (!state.session) return coarse;
+        const now = performance.now();
+        if (foundPacket && foundPacket.type === 'chunk') {
+          const lead = Math.min(120, Math.max(24, state.detectCostMs * 0.75));
+          const predicted = now + state.estimatedFrameDelay - lead;
+          state.predictedNextAt = predicted;
+          return Math.max(12, predicted - now);
+        }
+        if (state.predictedNextAt > now && state.lockStrength >= 0.25) {
+          return Math.max(12, Math.min(140, state.predictedNextAt - now));
+        }
+        const fallback = Math.max(28, Math.min(90, state.estimatedFrameDelay * 0.28));
+        return fallback;
+      }
+
       async function startScan() {
         if (!stream || !detector || scanLoopActive) return;
-        scanLoopActive = true; runId++; const myRunId = runId;
-        el.startScanBtn.disabled = true; el.stopScanBtn.disabled = false;
+        scanLoopActive = true;
+        runId++;
+        const myRunId = runId;
+        el.startScanBtn.disabled = true;
+        el.stopScanBtn.disabled = false;
         updateStatus('扫描中，请将二维码稳定置于画面中央');
+
         while (scanLoopActive && myRunId === runId) {
+          let packet = null;
           try {
             const raw = await detectOneFrame();
-            if (!raw) { await sleep(90); continue; }
-            if (sameFingerprint(raw)) { await sleep(80); continue; }
-            el.lastScanText.textContent = new Date().toLocaleTimeString();
-            const packet = parsePacket(raw);
-            if (!packet) { await sleep(70); continue; }
-            if (packet.type === 'meta') handleMeta(packet);
-            else if (packet.type === 'chunk') { handleChunk(packet); await finalizeIfComplete(); }
-            await sleep(40);
+            if (raw && !sameFingerprint(raw)) {
+              el.lastScanText.textContent = new Date().toLocaleTimeString();
+              packet = parsePacket(raw);
+              if (packet) {
+                if (packet.type === 'meta') handleMeta(packet);
+                else if (packet.type === 'chunk') {
+                  handleChunk(packet);
+                  await finalizeIfComplete();
+                }
+              }
+            }
           } catch (err) {
             console.error(err);
             updateStatus(`扫描异常：${err.message || err}`);
-            await sleep(150);
           }
+          await sleep(getNextSleepMs(packet));
         }
       }
 
-      function stopScan() { scanLoopActive = false; el.stopScanBtn.disabled = true; el.startScanBtn.disabled = !stream; }
+      function stopScan() {
+        scanLoopActive = false;
+        el.stopScanBtn.disabled = true;
+        el.startScanBtn.disabled = !stream;
+      }
 
       el.openCameraBtn.addEventListener('click', async () => { await openCamera(); await listCameras(); });
       el.startScanBtn.addEventListener('click', startScan);
@@ -451,8 +566,13 @@
       (async () => {
         el.modeText.textContent = window.matchMedia('(display-mode: standalone)').matches ? '已安装 PWA' : '浏览器 / 可安装';
         await registerServiceWorker();
-        try { await initDetector(); }
-        catch (err) { console.error(err); el.engineText.textContent = '不可用'; updateStatus(err.message || String(err)); }
+        try {
+          await initDetector();
+        } catch (err) {
+          console.error(err);
+          el.engineText.textContent = '不可用';
+          updateStatus(err.message || String(err));
+        }
         if (navigator.mediaDevices?.addEventListener) navigator.mediaDevices.addEventListener('devicechange', listCameras);
         await listCameras();
       })();
