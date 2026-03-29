@@ -38,8 +38,8 @@
   <div class="app">
     <div class="card stack">
       <div>
-        <h1>二维码离线收件（系统型 Fountain 版）</h1>
-        <p class="muted">接收端不再等待“下一轮补齐某个编号”，而是把系统块与 XOR 修复块都当成自由度，按代解码。</p>
+        <h1>二维码离线收件（系统型 Fountain 版 / 协议瘦身）</h1>
+        <p class="muted">接收端不再等待“下一轮补齐某个编号”，而是把系统块与 XOR 修复块都当成自由度，按代解码。该版本支持瘦身协议：数据帧省略 sessionId，repair 帧省略显式 seed。</p>
       </div>
 
       <select id="cameraSelect"></select>
@@ -66,7 +66,7 @@
         <p><strong>整体校验：</strong><span id="integrityText">-</span></p>
         <p><strong>最后扫码：</strong><span id="lastScanText">-</span></p>
         <div id="missingText" class="missing">未完成代：-</div>
-        <p class="small">最佳效果依赖较新的 Android Chrome 和 BarcodeDetector。解码器先做 peeling，再对剩余小残差做 GF(2) 高斯消元。</p>
+        <p class="small">最佳效果依赖较新的 Android Chrome 和 BarcodeDetector。该版使用瘦身协议以减少单帧头部开销；解码器先做 peeling，再对剩余小残差做 GF(2) 高斯消元。</p>
       </div>
     </div>
   </div>
@@ -269,23 +269,20 @@
             sessionSalt: b36ToInt(parts[18]) >>> 0,
           };
         }
-        if (parts[0] === 'S' && parts.length === 5) {
+        if (parts[0] === 'S' && parts.length === 4) {
           return {
             type: 'systematic',
-            sessionId: parts[1],
-            gid: b36ToInt(parts[2]),
-            esi: b36ToInt(parts[3]),
-            data: fromBase64Url(parts[4]),
+            gid: b36ToInt(parts[1]),
+            esi: b36ToInt(parts[2]),
+            data: fromBase64Url(parts[3]),
           };
         }
-        if (parts[0] === 'E' && parts.length === 6) {
+        if (parts[0] === 'E' && parts.length === 4) {
           return {
             type: 'repair',
-            sessionId: parts[1],
-            gid: b36ToInt(parts[2]),
-            esi: b36ToInt(parts[3]),
-            seed: b36ToInt(parts[4]) >>> 0,
-            data: fromBase64Url(parts[5]),
+            gid: b36ToInt(parts[1]),
+            esi: b36ToInt(parts[2]),
+            data: fromBase64Url(parts[3]),
           };
         }
         return null;
@@ -429,7 +426,7 @@
         }
       }
       async function handleSystematic(packet) {
-        if (!state.meta || packet.sessionId !== state.meta.sessionId) return;
+        if (!state.meta) return;
         const gen = getGeneration(packet.gid);
         if (!gen || packet.esi < 0 || packet.esi >= gen.k) return;
         if (gen.decoded) return;
@@ -440,10 +437,10 @@
         updateProgressUI();
       }
       async function handleRepair(packet) {
-        if (!state.meta || packet.sessionId !== state.meta.sessionId) return;
+        if (!state.meta) return;
         const gen = getGeneration(packet.gid);
         if (!gen || gen.decoded) return;
-        const seed = Number.isInteger(packet.seed) ? packet.seed >>> 0 : seedFrom(state.meta.sessionSalt, packet.gid, packet.esi);
+        const seed = seedFrom(state.meta.sessionSalt, packet.gid, packet.esi);
         const neighbors = uniqueNeighbors(seed, gen.k);
         const mask = maskForIndices(neighbors);
         gen.receivedRepair++;
