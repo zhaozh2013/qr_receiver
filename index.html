@@ -2,1028 +2,936 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#111827" />
-  <title>QR Fountain Receiver - ROI / Worker / 视频帧驱动版</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>QR Fountain Receiver - Android Chrome</title>
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
   <style>
     :root {
-      --bg:#f3f4f6; --panel:#fff; --text:#111827; --muted:#6b7280; --line:#d1d5db;
-      --primary:#111827; --danger:#b91c1c; --ok:#065f46; --warn:#92400e;
+      --bg:#0b1020; --panel:#121933; --panel2:#0f1730; --text:#f3f4f6; --muted:#97a0b7;
+      --line:#26304f; --ok:#1f9d63; --warn:#d97706; --danger:#dc2626; --accent:#3b82f6;
     }
     * { box-sizing:border-box; }
-    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-    body { min-height:100dvh; }
-    .app { max-width:1080px; margin:0 auto; padding:12px; }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:0 6px 20px rgba(0,0,0,.04); }
-    h1 { margin:0 0 6px; font-size:22px; }
-    p { margin:6px 0; line-height:1.45; }
-    .muted { color:var(--muted); }
-    .controls { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
-    .controls button, .controls select { appearance:none; font-size:15px; }
-    button { border:1px solid var(--primary); background:var(--primary); color:#fff; padding:10px 14px; border-radius:12px; cursor:pointer; }
-    button.secondary { background:#fff; color:var(--primary); }
-    button.danger { background:var(--danger); border-color:var(--danger); }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    select, input[type="number"] {
-      width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:#fff;
-    }
-    .grid { display:grid; grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 0.9fr); gap:12px; }
-    @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
-    .stack { display:grid; gap:12px; }
-    .videoWrap { position:relative; }
-    video, canvas.overlay {
-      width:100%; border:1px solid var(--line); border-radius:16px; background:#000; aspect-ratio:3 / 4; object-fit:cover;
-    }
-    canvas.overlay { position:absolute; inset:0; border:none; background:transparent; pointer-events:none; }
-    .status {
-      padding:12px; border:1px solid var(--line); border-radius:14px; background:#fafafa;
-    }
+    body { margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { max-width:1200px; margin:0 auto; padding:14px; }
+    .grid { display:grid; grid-template-columns: minmax(320px,420px) 1fr; gap:14px; align-items:start; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+    h1 { margin:0 0 10px; font-size:22px; }
+    p { margin:8px 0; color:var(--muted); }
+    .controls { display:grid; gap:10px; }
+    .row { display:grid; grid-template-columns: 120px 1fr; gap:10px; align-items:center; }
+    .row label { color:#d6dae6; font-size:14px; }
+    select, input[type="range"], input[type="checkbox"] { width:100%; }
+    select { background:#0d1429; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px; font-size:14px; }
+    button { appearance:none; border:1px solid #33569b; background:#1f4fb2; color:#fff; padding:11px 14px; border-radius:12px; font-size:15px; cursor:pointer; }
+    button.secondary { background:transparent; border-color:var(--line); }
+    button.warn { background:#8a4b00; border-color:#a25a00; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .btns { display:flex; flex-wrap:wrap; gap:8px; }
+    .status { display:grid; gap:8px; margin-top:12px; }
+    .statusBox { border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.03); padding:10px 12px; }
     .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; word-break:break-all; }
-    .progressWrap { width:100%; height:14px; background:#e5e7eb; border-radius:999px; overflow:hidden; margin:10px 0 8px; }
-    .progressBar { height:100%; width:0%; background:#111827; transition:width .12s linear; }
+    .kv { display:grid; grid-template-columns: 88px 1fr; gap:8px; font-size:14px; }
+    .kv > div:nth-child(odd) { color:var(--muted); }
+    .progressWrap { height:14px; border-radius:999px; border:1px solid var(--line); background:#0a1020; overflow:hidden; }
+    .progress { height:100%; width:0%; background:linear-gradient(90deg,#1f9d63,#37c27b); }
+    .subprogress { height:8px; border-radius:999px; border:1px solid var(--line); background:#0a1020; overflow:hidden; }
+    .subprogress > div { height:100%; width:0%; background:linear-gradient(90deg,#3b82f6,#60a5fa); }
+    .cameraCard { position:relative; overflow:hidden; }
+    video { width:100%; display:block; border-radius:14px; background:#000; }
+    canvas.overlay { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+    .badges { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .badge { border:1px solid var(--line); padding:6px 10px; border-radius:999px; font-size:12px; color:#dbe3f7; background:rgba(255,255,255,.03); }
+    .ok { color:#8af0b9; }
+    .warnText { color:#ffcc7a; }
+    .dangerText { color:#ff9b9b; }
+    .genList { display:grid; grid-template-columns: repeat(auto-fill,minmax(155px,1fr)); gap:8px; margin-top:10px; }
+    .genItem { border:1px solid var(--line); border-radius:12px; padding:8px; background:rgba(255,255,255,.03); }
+    .genTitle { font-size:12px; color:#d9dfee; margin-bottom:6px; }
+    .footerActions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    a.download { display:inline-flex; align-items:center; justify-content:center; padding:11px 14px; border-radius:12px; text-decoration:none; color:#fff; background:#0f8b55; border:1px solid #0ea765; }
     .small { font-size:12px; color:var(--muted); }
-    .ok { color:var(--ok); }
-    .warn { color:var(--warn); }
-    .missing {
-      font-size:12px; color:var(--muted); word-break:break-all; max-height:110px; overflow:auto;
-      border-top:1px dashed var(--line); margin-top:10px; padding-top:10px;
-    }
-    .row { display:grid; grid-template-columns:140px 1fr; gap:10px; align-items:center; }
-    .pill {
-      display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px;
-      border:1px solid var(--line); background:#fff; margin-right:6px;
-    }
-    .metrics { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div class="card stack">
-      <div>
-        <h1>二维码离线收件（ROI / Worker / 视频帧驱动版）</h1>
-        <p class="muted">优化点：低清全图找码、命中后优先局部 ROI 扫描、Worker 中运行 jsQR、requestVideoFrameCallback 驱动、节流与重复帧抑制、代内 peeling + 小残差 GF(2) 高斯消元。</p>
-      </div>
-
-      <div class="grid">
-        <div class="stack">
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h1>二维码喷泉接收端（Android Chrome 优化）</h1>
+        <p>基于上传文件中的 sender 协议实现：支持 Meta / Systematic / Repair 三种帧，支持二进制 QR 载荷，优先为安卓 Chrome 做低延迟识别与恢复。</p>
+        <div class="controls">
           <div class="row">
             <label for="cameraSelect">摄像头</label>
             <select id="cameraSelect"></select>
           </div>
           <div class="row">
-            <label for="globalMaxEdge">全图长边</label>
-            <input id="globalMaxEdge" type="number" min="320" max="1280" step="10" value="720" />
+            <label for="scanScale">解码尺寸</label>
+            <select id="scanScale">
+              <option value="384">384 × 384（更快）</option>
+              <option value="448" selected>448 × 448（默认）</option>
+              <option value="512">512 × 512（更稳）</option>
+              <option value="640">640 × 640（更稳但更慢）</option>
+            </select>
           </div>
           <div class="row">
-            <label for="roiMaxEdge">ROI 长边</label>
-            <input id="roiMaxEdge" type="number" min="320" max="1280" step="10" value="900" />
+            <label for="scanInterval">扫描间隔</label>
+            <select id="scanInterval">
+              <option value="0">尽可能快</option>
+              <option value="30" selected>30 ms</option>
+              <option value="45">45 ms</option>
+              <option value="60">60 ms</option>
+            </select>
           </div>
           <div class="row">
-            <label for="decodeInterval">最短解码间隔(ms)</label>
-            <input id="decodeInterval" type="number" min="10" max="100" step="1" value="22" />
+            <label for="cropMode">取景区域</label>
+            <select id="cropMode">
+              <option value="adaptive" selected>自适应中心裁剪</option>
+              <option value="full">全画面</option>
+            </select>
           </div>
           <div class="row">
-            <label for="fallbackFrames">ROI 回退阈值</label>
-            <input id="fallbackFrames" type="number" min="2" max="30" step="1" value="8" />
+            <label for="torchToggle">补光灯</label>
+            <input id="torchToggle" type="checkbox" />
           </div>
-
-          <div class="controls">
-            <button id="openCameraBtn">打开摄像头</button>
-            <button id="startScanBtn" disabled>开始接收</button>
-            <button id="stopScanBtn" class="danger" disabled>停止</button>
-            <button id="resetBtn" class="secondary">重置</button>
-            <button id="torchBtn" class="secondary" disabled>补光灯</button>
+          <div class="row">
+            <label for="keepAwake">保持唤醒</label>
+            <input id="keepAwake" type="checkbox" checked />
           </div>
-
-          <div class="videoWrap">
-            <video id="video" muted autoplay playsinline></video>
-            <canvas id="overlay" class="overlay"></canvas>
-          </div>
+        </div>
+        <div class="btns" style="margin-top:12px;">
+          <button id="startBtn">开始接收</button>
+          <button id="stopBtn" class="secondary" disabled>停止</button>
+          <button id="resetBtn" class="warn">重置会话</button>
         </div>
 
         <div class="status">
-          <p><strong>状态：</strong><span id="statusText">请先打开摄像头</span></p>
-          <p><strong>扫描引擎：</strong><span id="engineText">初始化中</span></p>
-          <p><strong>会话ID：</strong><span id="sessionIdText" class="mono">-</span></p>
-          <p><strong>文件：</strong><span id="fileInfo">-</span></p>
-          <p><strong>参数：</strong><span id="paramInfo">-</span></p>
-          <p><strong>最近帧：</strong><span id="frameText">-</span></p>
-          <p><strong>扫描策略：</strong><span id="scanModeText">-</span></p>
-          <p><strong>整体进度：</strong><span id="progressText">0 / 0</span></p>
-          <div class="progressWrap"><div id="progressBar" class="progressBar"></div></div>
-          <p><strong>代解码：</strong><span id="decodeText">-</span></p>
-          <p><strong>整体校验：</strong><span id="integrityText">-</span></p>
-          <p><strong>最后扫码：</strong><span id="lastScanText">-</span></p>
-          <div class="metrics">
-            <p><strong>提交帧率：</strong><span id="submitFpsText">0.0 fps</span></p>
-            <p><strong>解码帧率：</strong><span id="decodeFpsText">0.0 fps</span></p>
-            <p><strong>平均耗时：</strong><span id="latencyText">-</span></p>
-            <p><strong>Worker 队列：</strong><span id="queueText">0</span></p>
+          <div class="statusBox">
+            <div class="kv">
+              <div>状态</div><div id="statusText">等待开始</div>
+              <div>会话</div><div id="sessionText" class="mono">-</div>
+              <div>文件</div><div id="fileText">-</div>
+              <div>压缩</div><div id="compressionText">-</div>
+              <div>扫描</div><div id="scanText">-</div>
+            </div>
           </div>
-          <div id="missingText" class="missing">未完成代：-</div>
-          <p class="small">
-            <span class="pill">低清全图找码</span>
-            <span class="pill">局部 ROI 稳码</span>
-            <span class="pill">Worker jsQR</span>
-            <span class="pill">视频帧驱动</span>
-          </p>
+          <div class="statusBox">
+            <div class="kv">
+              <div>整体进度</div><div id="progressText">0 / 0</div>
+              <div>已知源块</div><div id="knownText">0</div>
+              <div>去重帧</div><div id="dupText">0</div>
+              <div>修复帧</div><div id="repairText">0</div>
+              <div>解码速度</div><div id="fpsText">-</div>
+            </div>
+            <div class="progressWrap" style="margin-top:10px;"><div id="progressBar" class="progress"></div></div>
+          </div>
+          <div class="statusBox">
+            <div><strong>最近帧</strong></div>
+            <div id="lastFrameText" class="mono small" style="margin-top:6px;">-</div>
+          </div>
         </div>
+
+        <div class="footerActions">
+          <a id="downloadLink" class="download" href="#" download style="display:none;">下载重建文件</a>
+        </div>
+      </div>
+
+      <div class="card cameraCard">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay" class="overlay"></canvas>
+        <div class="badges">
+          <div class="badge" id="badgeDetector">解码器：jsQR Worker</div>
+          <div class="badge" id="badgeTorch">Torch: 未知</div>
+          <div class="badge" id="badgeSession">无会话</div>
+          <div class="badge" id="badgeComplete">未完成</div>
+        </div>
+        <div id="genList" class="genList"></div>
       </div>
     </div>
   </div>
 
-  <script>
-    (() => {
-      const el = {
-        cameraSelect: document.getElementById('cameraSelect'),
-        globalMaxEdge: document.getElementById('globalMaxEdge'),
-        roiMaxEdge: document.getElementById('roiMaxEdge'),
-        decodeInterval: document.getElementById('decodeInterval'),
-        fallbackFrames: document.getElementById('fallbackFrames'),
-        openCameraBtn: document.getElementById('openCameraBtn'),
-        startScanBtn: document.getElementById('startScanBtn'),
-        stopScanBtn: document.getElementById('stopScanBtn'),
-        resetBtn: document.getElementById('resetBtn'),
-        torchBtn: document.getElementById('torchBtn'),
-        video: document.getElementById('video'),
-        overlay: document.getElementById('overlay'),
-        statusText: document.getElementById('statusText'),
-        engineText: document.getElementById('engineText'),
-        sessionIdText: document.getElementById('sessionIdText'),
-        fileInfo: document.getElementById('fileInfo'),
-        paramInfo: document.getElementById('paramInfo'),
-        frameText: document.getElementById('frameText'),
-        scanModeText: document.getElementById('scanModeText'),
-        progressText: document.getElementById('progressText'),
-        progressBar: document.getElementById('progressBar'),
-        decodeText: document.getElementById('decodeText'),
-        integrityText: document.getElementById('integrityText'),
-        lastScanText: document.getElementById('lastScanText'),
-        missingText: document.getElementById('missingText'),
-        submitFpsText: document.getElementById('submitFpsText'),
-        decodeFpsText: document.getElementById('decodeFpsText'),
-        latencyText: document.getElementById('latencyText'),
-        queueText: document.getElementById('queueText'),
-      };
+<script>
+(() => {
+  'use strict';
 
-      let stream = null;
-      let videoTrack = null;
-      let scanLoopActive = false;
-      let worker = null;
-      let detectorReady = false;
-      let torchOn = false;
-      let requestId = 0;
-      let inflight = false;
-      let hasVFC = !!HTMLVideoElement.prototype.requestVideoFrameCallback;
+  const el = {
+    video: document.getElementById('video'),
+    overlay: document.getElementById('overlay'),
+    cameraSelect: document.getElementById('cameraSelect'),
+    scanScale: document.getElementById('scanScale'),
+    scanInterval: document.getElementById('scanInterval'),
+    cropMode: document.getElementById('cropMode'),
+    torchToggle: document.getElementById('torchToggle'),
+    keepAwake: document.getElementById('keepAwake'),
+    startBtn: document.getElementById('startBtn'),
+    stopBtn: document.getElementById('stopBtn'),
+    resetBtn: document.getElementById('resetBtn'),
+    statusText: document.getElementById('statusText'),
+    sessionText: document.getElementById('sessionText'),
+    fileText: document.getElementById('fileText'),
+    compressionText: document.getElementById('compressionText'),
+    scanText: document.getElementById('scanText'),
+    progressText: document.getElementById('progressText'),
+    knownText: document.getElementById('knownText'),
+    dupText: document.getElementById('dupText'),
+    repairText: document.getElementById('repairText'),
+    fpsText: document.getElementById('fpsText'),
+    progressBar: document.getElementById('progressBar'),
+    lastFrameText: document.getElementById('lastFrameText'),
+    downloadLink: document.getElementById('downloadLink'),
+    badgeDetector: document.getElementById('badgeDetector'),
+    badgeTorch: document.getElementById('badgeTorch'),
+    badgeSession: document.getElementById('badgeSession'),
+    badgeComplete: document.getElementById('badgeComplete'),
+    genList: document.getElementById('genList')
+  };
 
-      const captureCanvas = document.createElement('canvas');
-      const captureCtx = captureCanvas.getContext('2d', { willReadFrequently: true });
-      const overlayCtx = el.overlay.getContext('2d');
+  const overlayCtx = el.overlay.getContext('2d');
+  const captureCanvas = document.createElement('canvas');
+  const captureCtx = captureCanvas.getContext('2d', { willReadFrequently: true, alpha: false });
 
-      const state = {
-        meta: null,
-        generations: new Map(),
-        completedBytes: new Map(),
-        lastFingerprint: '',
-        lastFingerprintAt: 0,
-        lastBoxVideo: null,
-        missCount: 0,
-        lastSubmitAt: 0,
-        workerBusySince: 0,
-        pendingMode: 'full',
-        frameStats: {
-          submitTimes: [],
-          decodeTimes: [],
-          decodeLatencies: [],
-        }
-      };
+  let stream = null;
+  let track = null;
+  let wakeLock = null;
+  let worker = null;
+  let running = false;
+  let decodeBusy = false;
+  let lastScanAt = 0;
+  let lastSuccessAt = 0;
+  let lastDetection = null;
+  let drawLoopHandle = 0;
+  let frameCounter = 0;
+  let decodeCounter = 0;
+  let decodeCounterWindowStart = performance.now();
+  let stats = { duplicates: 0, repairs: 0, decodedFrames: 0 };
+  let activeSession = null;
+  let completedBlobUrl = null;
 
-      const textDecoder = new TextDecoder();
+  const textDecoder = new TextDecoder();
+  const utf8Decoder = new TextDecoder();
 
-      function updateStatus(text) { el.statusText.textContent = text; }
-      function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-      function now() { return performance.now(); }
-      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-      function formatBytes(n) {
-        if (!Number.isFinite(n)) return '-';
-        const units = ['B', 'KB', 'MB', 'GB'];
-        let i = 0, value = n;
-        while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
-        return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
-      }
-      function b36ToInt(s) { return parseInt(s, 36); }
-      function fromBase64Url(s) {
-        s = s.replace(/-/g, '+').replace(/_/g, '/');
-        while (s.length % 4) s += '=';
-        const bin = atob(s);
-        const out = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-        return out;
-      }
-      function base64UrlToText(s) { return textDecoder.decode(fromBase64Url(s)); }
+  function updateStatus(text, cls='') {
+    el.statusText.textContent = text;
+    el.statusText.className = cls;
+  }
+  function formatBytes(n) {
+    if (!Number.isFinite(n)) return '-';
+    const units = ['B','KB','MB','GB'];
+    let i = 0; let v = n;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
+  }
+  function b36ToInt(s) { return parseInt(s, 36); }
+  function base64UrlToBytes(s) {
+    const normalized = s.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '==='.slice(0, (4 - normalized.length % 4) % 4);
+    const bin = atob(normalized + padding);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
+    return out;
+  }
+  function base64UrlToText(s) { return utf8Decoder.decode(base64UrlToBytes(s)); }
+  function putU16BE(arr, offset, value) {
+    arr[offset] = (value >>> 8) & 0xff;
+    arr[offset + 1] = value & 0xff;
+  }
+  function getU16BE(arr, offset) {
+    return ((arr[offset] << 8) | arr[offset + 1]) >>> 0;
+  }
+  function bytesEq(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+  function xorInto(out, input) {
+    for (let i = 0; i < out.length; i++) out[i] ^= input[i];
+  }
+  function highestBitIndex(x) {
+    let idx = -1;
+    let y = x;
+    while (y) { y >>= 1n; idx++; }
+    return idx;
+  }
+  function popcountBigInt(x) {
+    let n = 0;
+    let y = x;
+    while (y) { y &= (y - 1n); n++; }
+    return n;
+  }
+  function bitIndices(mask, limit) {
+    const arr = [];
+    for (let i = 0; i < limit; i++) if (((mask >> BigInt(i)) & 1n) === 1n) arr.push(i);
+    return arr;
+  }
+  function mulberry32(seed) {
+    let t = seed >>> 0;
+    return function() {
+      t += 0x6D2B79F5;
+      let x = t;
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function seedFrom(sessionSalt, generationId, esi) {
+    let x = (sessionSalt ^ Math.imul((generationId + 1) >>> 0, 0x9E3779B1) ^ Math.imul((esi + 1) >>> 0, 0x85EBCA6B)) >>> 0;
+    x ^= x >>> 16;
+    x = Math.imul(x, 0x7feb352d) >>> 0;
+    x ^= x >>> 15;
+    x = Math.imul(x, 0x846ca68b) >>> 0;
+    return (x ^ (x >>> 16)) >>> 0;
+  }
+  function chooseDegree(rng, k) {
+    const table = [2,2,2,3,3,3,4,4,5,6,8,10,12,16];
+    const d = table[Math.floor(rng() * table.length)] || 3;
+    return Math.min(k, d);
+  }
+  function uniqueNeighbors(seed, k) {
+    const rng = mulberry32(seed);
+    const degree = chooseDegree(rng, k);
+    const set = new Set();
+    while (set.size < degree) set.add(Math.floor(rng() * k));
+    return [...set];
+  }
+  function neighborsToMask(neighbors) {
+    let mask = 0n;
+    for (const idx of neighbors) mask |= (1n << BigInt(idx));
+    return mask;
+  }
 
-      function makeCRCTable() {
-        const table = new Uint32Array(256);
-        for (let i = 0; i < 256; i++) {
-          let c = i;
-          for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-          table[i] = c >>> 0;
-        }
-        return table;
-      }
-      const CRC_TABLE = makeCRCTable();
-      function crc32(uint8) {
-        let crc = 0xFFFFFFFF;
-        for (let i = 0; i < uint8.length; i++) crc = CRC_TABLE[(crc ^ uint8[i]) & 0xFF] ^ (crc >>> 8);
-        return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).padStart(8, '0');
-      }
-      function xorInto(out, input) {
-        for (let i = 0; i < out.length; i++) out[i] ^= input[i];
-      }
-      function cloneBytes(bytes) {
-        const out = new Uint8Array(bytes.length);
-        out.set(bytes);
-        return out;
-      }
-      function mulberry32(seed) {
-        let t = seed >>> 0;
-        return function() {
-          t += 0x6D2B79F5;
-          let x = t;
-          x = Math.imul(x ^ (x >>> 15), x | 1);
-          x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-          return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-        };
-      }
-      function chooseDegree(rng, k) {
-        const table = [2,2,2,3,3,3,4,4,5,6,8,10,12,16];
-        const d = table[Math.floor(rng() * table.length)] || 3;
-        return Math.min(k, d);
-      }
-      function seedFrom(sessionSalt, generationId, esi) {
-        let x = (sessionSalt ^ Math.imul((generationId + 1) >>> 0, 0x9E3779B1) ^ Math.imul((esi + 1) >>> 0, 0x85EBCA6B)) >>> 0;
-        x ^= x >>> 16;
-        x = Math.imul(x, 0x7feb352d) >>> 0;
-        x ^= x >>> 15;
-        x = Math.imul(x, 0x846ca68b) >>> 0;
-        return (x ^ (x >>> 16)) >>> 0;
-      }
-      function uniqueNeighbors(seed, k) {
-        const rng = mulberry32(seed);
-        const degree = chooseDegree(rng, k);
-        const set = new Set();
-        while (set.size < degree) set.add(Math.floor(rng() * k));
-        return [...set];
-      }
-      function bitCount(mask) {
-        let count = 0;
-        let x = mask;
-        while (x) { x &= x - 1n; count++; }
-        return count;
-      }
-      function lowestBitIndex(mask) {
-        let idx = 0;
-        let x = mask;
-        while ((x & 1n) === 0n) { x >>= 1n; idx++; }
-        return idx;
-      }
-      function generationSourceCount(meta, gid) {
-        if (gid < meta.genCount - 1) return meta.generationK;
-        return meta.lastGenSourceCount || meta.generationK;
-      }
-      function createGeneration(meta, gid) {
-        const k = generationSourceCount(meta, gid);
-        return {
-          gid,
-          k,
-          known: new Array(k).fill(null),
-          equations: [],
-          receivedSystematic: 0,
-          receivedRepair: 0,
-          decoded: false,
-          innovationCount: 0,
-        };
-      }
+  function makeCRCTable() {
+    const t = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[i] = c >>> 0;
+    }
+    return t;
+  }
+  const CRC_TABLE = makeCRCTable();
+  function crc32(uint8) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < uint8.length; i++) crc = CRC_TABLE[(crc ^ uint8[i]) & 0xFF] ^ (crc >>> 8);
+    return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).padStart(8, '0');
+  }
 
-      function resetState(keepCamera = true) {
-        state.meta = null;
-        state.generations = new Map();
-        state.completedBytes = new Map();
-        state.lastFingerprint = '';
-        state.lastFingerprintAt = 0;
-        state.lastBoxVideo = null;
-        state.missCount = 0;
-        state.lastSubmitAt = 0;
-        state.workerBusySince = 0;
-        state.pendingMode = 'full';
-        state.frameStats.submitTimes = [];
-        state.frameStats.decodeTimes = [];
-        state.frameStats.decodeLatencies = [];
-        el.sessionIdText.textContent = '-';
-        el.fileInfo.textContent = '-';
-        el.paramInfo.textContent = '-';
-        el.frameText.textContent = '-';
-        el.scanModeText.textContent = '-';
-        el.progressText.textContent = '0 / 0';
-        el.progressBar.style.width = '0%';
-        el.decodeText.textContent = '-';
-        el.integrityText.textContent = '-';
-        el.lastScanText.textContent = '-';
-        el.missingText.textContent = '未完成代：-';
-        updateMetrics();
-        clearOverlay();
-        updateStatus(keepCamera ? '摄像头已就绪，可以开始接收' : '请先打开摄像头');
-      }
+  class GenerationState {
+    constructor(gid, sourceCount, blockSize) {
+      this.gid = gid;
+      this.sourceCount = sourceCount;
+      this.blockSize = blockSize;
+      this.knownBlocks = new Array(sourceCount).fill(null);
+      this.knownMask = 0n;
+      this.knownCount = 0;
+      this.systematicSeen = new Set();
+      this.repairSeen = new Set();
+      this.equations = [];
+    }
 
-      function rememberEvent(list, t) {
-        list.push(t);
-        const cutoff = t - 1000;
-        while (list.length && list[0] < cutoff) list.shift();
-      }
+    addSystematic(esi, data) {
+      if (esi < 0 || esi >= this.sourceCount) return false;
+      if (this.knownBlocks[esi]) return false;
+      this.knownBlocks[esi] = new Uint8Array(data);
+      this.knownMask |= (1n << BigInt(esi));
+      this.knownCount++;
+      this.peelAll();
+      return true;
+    }
 
-      function updateMetrics() {
-        const t = now();
-        state.frameStats.submitTimes = state.frameStats.submitTimes.filter(v => v >= t - 1000);
-        state.frameStats.decodeTimes = state.frameStats.decodeTimes.filter(v => v >= t - 1000);
-        el.submitFpsText.textContent = `${state.frameStats.submitTimes.length.toFixed(1)} fps`;
-        el.decodeFpsText.textContent = `${state.frameStats.decodeTimes.length.toFixed(1)} fps`;
-        const lats = state.frameStats.decodeLatencies;
-        if (!lats.length) el.latencyText.textContent = '-';
-        else {
-          const avg = lats.reduce((a, b) => a + b, 0) / lats.length;
-          el.latencyText.textContent = `${avg.toFixed(1)} ms`;
-        }
-        el.queueText.textContent = inflight ? '1' : '0';
-      }
-
-      function sameFingerprint(str) {
-        const t = now();
-        if (state.lastFingerprint === str && t - state.lastFingerprintAt < 80) return true;
-        state.lastFingerprint = str;
-        state.lastFingerprintAt = t;
-        return false;
-      }
-
-      function maskForIndices(indices) {
-        let mask = 0n;
-        for (const i of indices) mask |= (1n << BigInt(i));
-        return mask;
-      }
-
-      function getU16BE(arr, offset) {
-        return ((arr[offset] << 8) | arr[offset + 1]) >>> 0;
-      }
-
-      function parsePacket(raw, binaryData) {
-        if (typeof raw === 'string' && raw.startsWith('M|')) {
-          const parts = raw.split('|');
-          if (parts[0] === 'M' && parts.length === 19) {
-            return {
-              type: 'meta',
-              version: parts[1],
-              sessionId: parts[2],
-              fileName: base64UrlToText(parts[3]),
-              mime: base64UrlToText(parts[4]),
-              originalSize: b36ToInt(parts[5]),
-              payloadSize: b36ToInt(parts[6]),
-              compression: parts[7] === '1' ? 'gzip' : 'none',
-              blockSize: b36ToInt(parts[8]),
-              generationK: b36ToInt(parts[9]),
-              totalSourceBlocks: b36ToInt(parts[10]),
-              genCount: b36ToInt(parts[11]),
-              lastGenSourceCount: b36ToInt(parts[12]),
-              fileCrc32: parts[13],
-              frameDelay: b36ToInt(parts[14]),
-              metaEvery: b36ToInt(parts[15]),
-              systematicWeight: b36ToInt(parts[16]),
-              repairWeight: b36ToInt(parts[17]),
-              sessionSalt: b36ToInt(parts[18]) >>> 0,
-            };
-          }
-          return null;
-        }
-        const bytes = binaryData instanceof Uint8ClampedArray || binaryData instanceof Uint8Array
-          ? new Uint8Array(binaryData)
-          : (typeof raw === 'string' ? Uint8Array.from(raw, ch => ch.charCodeAt(0) & 0xFF) : null);
-        if (!bytes || bytes.length < 5) return null;
-        if (bytes[0] === 0x53) {
-          return { type: 'systematic', gid: getU16BE(bytes, 1), esi: getU16BE(bytes, 3), data: bytes.slice(5) };
-        }
-        if (bytes[0] === 0x45) {
-          return { type: 'repair', gid: getU16BE(bytes, 1), esi: getU16BE(bytes, 3), data: bytes.slice(5) };
-        }
-        return null;
-      }
-
-      function ensureMeta(meta) {
-        if (!state.meta) {
-          state.meta = meta;
-          el.sessionIdText.textContent = meta.sessionId;
-          el.fileInfo.textContent = `${meta.fileName} · ${formatBytes(meta.originalSize)}` + (meta.payloadSize !== meta.originalSize ? ` · 载荷 ${formatBytes(meta.payloadSize)}` : '');
-          el.paramInfo.textContent = `块 ${meta.blockSize} B · 每代 ${meta.generationK} 块 · 共 ${meta.genCount} 代 · ${meta.compression}`;
-          el.integrityText.textContent = '已锁定会话，等待自由度';
-          updateStatus(`已锁定文件：${meta.fileName}`);
-          updateProgressUI();
-          return;
-        }
-        if (state.meta.sessionId === meta.sessionId) return;
-        updateStatus(`检测到新会话 ${meta.sessionId}，当前会话未完成，已忽略`);
-      }
-
-      function getGeneration(gid) {
-        if (!state.meta) return null;
-        if (gid < 0 || gid >= state.meta.genCount) return null;
-        if (!state.generations.has(gid)) state.generations.set(gid, createGeneration(state.meta, gid));
-        return state.generations.get(gid);
-      }
-
-      function assignKnown(gen, index, data) {
-        if (!gen.known[index]) {
-          gen.known[index] = cloneBytes(data);
-          gen.innovationCount++;
+    addRepair(esi, data, sessionSalt) {
+      if (this.repairSeen.has(esi)) return false;
+      this.repairSeen.add(esi);
+      const seed = seedFrom(sessionSalt, this.gid, esi);
+      const mask = neighborsToMask(uniqueNeighbors(seed, this.sourceCount));
+      const reduced = new Uint8Array(data);
+      const reducedMask = this.reduceKnown(mask, reduced);
+      if (reducedMask === 0n) return false;
+      const degree = popcountBigInt(reducedMask);
+      if (degree === 1) {
+        const idx = highestBitIndex(reducedMask);
+        if (!this.knownBlocks[idx]) {
+          this.knownBlocks[idx] = reduced;
+          this.knownMask |= (1n << BigInt(idx));
+          this.knownCount++;
+          this.peelAll();
           return true;
         }
         return false;
       }
+      this.equations.push({ mask: reducedMask, data: reduced, esi });
+      this.peelAll();
+      if (this.knownCount < this.sourceCount) this.tryGaussian();
+      return true;
+    }
 
-      function simplifyGeneration(gen) {
-        let progress = true;
-        while (progress) {
-          progress = false;
-          const nextEquations = [];
-          for (const eq of gen.equations) {
-            let mask = eq.mask;
-            const data = cloneBytes(eq.data);
-            for (let i = 0; i < gen.k; i++) {
-              if (gen.known[i] && ((mask >> BigInt(i)) & 1n)) {
-                xorInto(data, gen.known[i]);
-                mask &= ~(1n << BigInt(i));
-              }
-            }
-            if (mask === 0n) continue;
-            if (bitCount(mask) === 1) {
-              const idx = lowestBitIndex(mask);
-              if (assignKnown(gen, idx, data)) progress = true;
-              continue;
-            }
-            nextEquations.push({ mask, data });
+    reduceKnown(mask, data) {
+      let outMask = mask;
+      let known = this.knownMask & outMask;
+      while (known) {
+        const bit = known & -known;
+        const idx = highestBitIndex(bit);
+        xorInto(data, this.knownBlocks[idx]);
+        outMask ^= bit;
+        known ^= bit;
+      }
+      return outMask;
+    }
+
+    peelAll() {
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = this.equations.length - 1; i >= 0; i--) {
+          const eq = this.equations[i];
+          eq.mask = this.reduceKnown(eq.mask, eq.data);
+          const degree = popcountBigInt(eq.mask);
+          if (degree === 0) {
+            this.equations.splice(i, 1);
+            changed = true;
+            continue;
           }
-          gen.equations = dedupeEquations(nextEquations);
-        }
-      }
-
-      function dedupeEquations(rows) {
-        const seen = new Map();
-        const out = [];
-        for (const row of rows) {
-          const key = row.mask.toString();
-          if (seen.has(key)) continue;
-          seen.set(key, true);
-          out.push(row);
-        }
-        return out;
-      }
-
-      function gaussianSolveResidual(gen) {
-        const unknown = [];
-        for (let i = 0; i < gen.k; i++) if (!gen.known[i]) unknown.push(i);
-        if (!unknown.length) return true;
-
-        const rows = [];
-        for (const eq of gen.equations) {
-          let mask = eq.mask;
-          const data = cloneBytes(eq.data);
-          for (let i = 0; i < gen.k; i++) {
-            if (gen.known[i] && ((mask >> BigInt(i)) & 1n)) {
-              xorInto(data, gen.known[i]);
-              mask &= ~(1n << BigInt(i));
+          if (degree === 1) {
+            const idx = highestBitIndex(eq.mask);
+            if (!this.knownBlocks[idx]) {
+              this.knownBlocks[idx] = eq.data;
+              this.knownMask |= (1n << BigInt(idx));
+              this.knownCount++;
             }
+            this.equations.splice(i, 1);
+            changed = true;
           }
-          if (mask !== 0n) rows.push({ mask, data });
         }
-        if (rows.length < unknown.length) return false;
+      }
+    }
 
-        const pivots = [];
-        let row = 0;
-        for (let bit = 0; bit < gen.k && row < rows.length; bit++) {
-          if (gen.known[bit]) continue;
-          let pivot = -1;
-          for (let r = row; r < rows.length; r++) {
-            if ((rows[r].mask >> BigInt(bit)) & 1n) { pivot = r; break; }
+    tryGaussian() {
+      if (!this.equations.length) return;
+      const rows = [];
+      for (const eq of this.equations) {
+        const data = new Uint8Array(eq.data);
+        let mask = this.reduceKnown(eq.mask, data);
+        if (mask !== 0n) rows.push({ mask, data });
+      }
+      if (!rows.length) return;
+      let row = 0;
+      const pivots = [];
+      for (let col = this.sourceCount - 1; col >= 0 && row < rows.length; col--) {
+        const bit = 1n << BigInt(col);
+        let pivotRow = -1;
+        for (let r = row; r < rows.length; r++) {
+          if (rows[r].mask & bit) { pivotRow = r; break; }
+        }
+        if (pivotRow < 0) continue;
+        if (pivotRow !== row) [rows[pivotRow], rows[row]] = [rows[row], rows[pivotRow]];
+        for (let r = row + 1; r < rows.length; r++) {
+          if (rows[r].mask & bit) {
+            rows[r].mask ^= rows[row].mask;
+            xorInto(rows[r].data, rows[row].data);
           }
-          if (pivot === -1) continue;
-          [rows[row], rows[pivot]] = [rows[pivot], rows[row]];
-          for (let r = 0; r < rows.length; r++) {
-            if (r !== row && ((rows[r].mask >> BigInt(bit)) & 1n)) {
-              rows[r].mask ^= rows[row].mask;
-              xorInto(rows[r].data, rows[row].data);
-            }
+        }
+        pivots[row] = col;
+        row++;
+      }
+      let solvedAny = false;
+      const tempSolved = new Map();
+      for (let r = row - 1; r >= 0; r--) {
+        const pivotCol = pivots[r];
+        if (pivotCol == null) continue;
+        let mask = rows[r].mask;
+        const data = new Uint8Array(rows[r].data);
+        for (const idx of bitIndices(mask ^ (1n << BigInt(pivotCol)), this.sourceCount)) {
+          const known = this.knownBlocks[idx] || tempSolved.get(idx);
+          if (!known) {
+            mask = null;
+            break;
           }
-          pivots.push({ row, bit });
-          row++;
+          xorInto(data, known);
         }
-        if (pivots.length < unknown.length) return false;
-        for (const { row, bit } of pivots) {
-          if (bitCount(rows[row].mask) !== 1) return false;
-          gen.known[bit] = cloneBytes(rows[row].data);
-        }
-        gen.equations = [];
-        return true;
+        if (mask === null) continue;
+        tempSolved.set(pivotCol, data);
       }
-
-      async function finalizeGenerationIfComplete(gen) {
-        if (gen.decoded) return;
-        if (gen.known.every(Boolean)) {
-          const blockSize = state.meta.blockSize;
-          const out = new Uint8Array(gen.k * blockSize);
-          for (let i = 0; i < gen.k; i++) out.set(gen.known[i], i * blockSize);
-          state.completedBytes.set(gen.gid, out);
-          gen.decoded = true;
-          updateStatus(`已完成第 ${gen.gid + 1} 代`);
-          updateProgressUI();
-          await finalizeFileIfComplete();
+      for (const [idx, data] of tempSolved.entries()) {
+        if (!this.knownBlocks[idx]) {
+          this.knownBlocks[idx] = data;
+          this.knownMask |= (1n << BigInt(idx));
+          this.knownCount++;
+          solvedAny = true;
         }
       }
+      if (solvedAny) this.peelAll();
+    }
+  }
 
-      function maybeSolveGeneration(gen) {
-        simplifyGeneration(gen);
-        if (!gen.known.every(Boolean)) {
-          const unknownCount = gen.known.filter(v => !v).length;
-          if (gen.equations.length >= unknownCount && unknownCount <= 24) gaussianSolveResidual(gen);
-          else if (gen.equations.length >= unknownCount + 4 && unknownCount <= gen.k) gaussianSolveResidual(gen);
-        }
+  function resetSession() {
+    activeSession = null;
+    stats = { duplicates: 0, repairs: 0, decodedFrames: 0 };
+    if (completedBlobUrl) URL.revokeObjectURL(completedBlobUrl);
+    completedBlobUrl = null;
+    el.sessionText.textContent = '-';
+    el.fileText.textContent = '-';
+    el.compressionText.textContent = '-';
+    el.progressText.textContent = '0 / 0';
+    el.knownText.textContent = '0';
+    el.dupText.textContent = '0';
+    el.repairText.textContent = '0';
+    el.progressBar.style.width = '0%';
+    el.lastFrameText.textContent = '-';
+    el.downloadLink.style.display = 'none';
+    el.downloadLink.removeAttribute('href');
+    el.badgeSession.textContent = '无会话';
+    el.badgeComplete.textContent = '未完成';
+    el.genList.innerHTML = '';
+    updateStatus('会话已重置');
+  }
+
+  function buildSessionFromMeta(meta) {
+    const generations = [];
+    for (let gid = 0; gid < meta.genCount; gid++) {
+      const sourceCount = gid === meta.genCount - 1 ? meta.lastGenSourceCount : meta.generationK;
+      generations.push(new GenerationState(gid, sourceCount, meta.blockSize));
+    }
+    return {
+      meta,
+      generations,
+      totalKnown: 0,
+      systematicFrames: 0,
+      repairFrames: 0,
+      frameKeys: new Set(),
+      completed: false,
+      assembledBytes: null,
+      startedAt: performance.now()
+    };
+  }
+
+  function parseMeta(bytes) {
+    const text = textDecoder.decode(bytes);
+    if (!text.startsWith('M|2|')) return null;
+    const parts = text.split('|');
+    if (parts.length < 19) return null;
+    return {
+      sessionId: parts[2],
+      fileName: base64UrlToText(parts[3]),
+      mime: base64UrlToText(parts[4]) || 'application/octet-stream',
+      originalSize: b36ToInt(parts[5]),
+      payloadSize: b36ToInt(parts[6]),
+      compression: parts[7] === '1' ? 'gzip' : 'none',
+      blockSize: b36ToInt(parts[8]),
+      generationK: b36ToInt(parts[9]),
+      totalSourceBlocks: b36ToInt(parts[10]),
+      genCount: b36ToInt(parts[11]),
+      lastGenSourceCount: b36ToInt(parts[12]),
+      fileCrc32: parts[13],
+      frameDelay: b36ToInt(parts[14]),
+      metaEvery: b36ToInt(parts[15]),
+      systematicWeight: b36ToInt(parts[16]),
+      repairWeight: b36ToInt(parts[17]),
+      sessionSalt: b36ToInt(parts[18]) >>> 0
+    };
+  }
+
+  function handleMeta(bytes) {
+    const meta = parseMeta(bytes);
+    if (!meta) return false;
+    if (!activeSession || activeSession.meta.sessionId !== meta.sessionId) {
+      activeSession = buildSessionFromMeta(meta);
+      el.sessionText.textContent = meta.sessionId;
+      el.fileText.textContent = `${meta.fileName} · ${formatBytes(meta.originalSize)}`;
+      el.compressionText.textContent = `${meta.compression} · payload ${formatBytes(meta.payloadSize)} · block ${meta.blockSize}B · gen ${meta.genCount}`;
+      el.badgeSession.textContent = `会话 ${meta.sessionId}`;
+      stats = { duplicates: 0, repairs: 0, decodedFrames: 0 };
+      renderGenerationCards();
+      updateStatus('已获取 Meta，开始接收数据', 'ok');
+    }
+    return true;
+  }
+
+  function frameKey(type, gid, esi) {
+    return `${type}:${gid}:${esi}`;
+  }
+
+  function recomputeTotals() {
+    if (!activeSession) return;
+    let known = 0;
+    for (const gen of activeSession.generations) known += gen.knownCount;
+    activeSession.totalKnown = known;
+    el.progressText.textContent = `${known} / ${activeSession.meta.totalSourceBlocks}`;
+    el.knownText.textContent = String(known);
+    el.dupText.textContent = String(stats.duplicates);
+    el.repairText.textContent = String(stats.repairs);
+    const pct = activeSession.meta.totalSourceBlocks ? (known / activeSession.meta.totalSourceBlocks) * 100 : 0;
+    el.progressBar.style.width = `${pct.toFixed(2)}%`;
+    renderGenerationCards();
+    if (!activeSession.completed && known >= activeSession.meta.totalSourceBlocks) finalizeSession();
+  }
+
+  function handlePayload(bytes) {
+    if (!activeSession) return false;
+    if (bytes.length < 5) return false;
+    const type = bytes[0];
+    const gid = getU16BE(bytes, 1);
+    const esi = getU16BE(bytes, 3);
+    if (gid < 0 || gid >= activeSession.generations.length) return false;
+    const gen = activeSession.generations[gid];
+    const payload = bytes.slice(5);
+    const typeChar = String.fromCharCode(type);
+    const key = frameKey(typeChar, gid, esi);
+    if (activeSession.frameKeys.has(key)) {
+      stats.duplicates++;
+      return true;
+    }
+    activeSession.frameKeys.add(key);
+    let changed = false;
+    if (type === 0x53) {
+      activeSession.systematicFrames++;
+      changed = gen.addSystematic(esi, payload);
+      el.lastFrameText.textContent = `S gid=${gid} esi=${esi} bytes=${payload.length}`;
+    } else if (type === 0x45) {
+      activeSession.repairFrames++;
+      stats.repairs++;
+      changed = gen.addRepair(esi, payload, activeSession.meta.sessionSalt);
+      el.lastFrameText.textContent = `E gid=${gid} esi=${esi} bytes=${payload.length}`;
+    } else {
+      return false;
+    }
+    if (changed) recomputeTotals();
+    return true;
+  }
+
+  function assemblePayloadBytes() {
+    const chunks = [];
+    for (const gen of activeSession.generations) {
+      for (let i = 0; i < gen.sourceCount; i++) {
+        if (!gen.knownBlocks[i]) throw new Error(`Generation ${gen.gid} missing block ${i}`);
+        chunks.push(gen.knownBlocks[i]);
       }
+    }
+    const merged = new Uint8Array(activeSession.meta.totalSourceBlocks * activeSession.meta.blockSize);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return merged.slice(0, activeSession.meta.payloadSize);
+  }
 
-      async function handleSystematic(packet) {
-        if (!state.meta) return;
-        const gen = getGeneration(packet.gid);
-        if (!gen || packet.esi < 0 || packet.esi >= gen.k || gen.decoded) return;
-        gen.receivedSystematic++;
-        assignKnown(gen, packet.esi, packet.data);
-        maybeSolveGeneration(gen);
-        await finalizeGenerationIfComplete(gen);
-        updateProgressUI();
+  function finalizeSession() {
+    try {
+      const payloadBytes = assemblePayloadBytes();
+      let original = payloadBytes;
+      if (activeSession.meta.compression === 'gzip') original = pako.ungzip(payloadBytes);
+      original = original.slice(0, activeSession.meta.originalSize);
+      const crc = crc32(original);
+      if (crc !== activeSession.meta.fileCrc32) {
+        updateStatus(`文件已拼出，但 CRC32 不匹配：${crc} ≠ ${activeSession.meta.fileCrc32}`, 'warnText');
+        return;
       }
+      activeSession.completed = true;
+      activeSession.assembledBytes = original;
+      const blob = new Blob([original], { type: activeSession.meta.mime || 'application/octet-stream' });
+      completedBlobUrl = URL.createObjectURL(blob);
+      el.downloadLink.href = completedBlobUrl;
+      el.downloadLink.download = activeSession.meta.fileName || 'received.bin';
+      el.downloadLink.style.display = 'inline-flex';
+      el.badgeComplete.textContent = '已完成';
+      updateStatus(`接收完成，用时 ${((performance.now() - activeSession.startedAt) / 1000).toFixed(1)} s，CRC32 校验通过`, 'ok');
+    } catch (err) {
+      updateStatus(`完成阶段出错：${err.message || err}`, 'dangerText');
+    }
+  }
 
-      async function handleRepair(packet) {
-        if (!state.meta) return;
-        const gen = getGeneration(packet.gid);
-        if (!gen || gen.decoded) return;
-        const seed = seedFrom(state.meta.sessionSalt, packet.gid, packet.esi);
-        const neighbors = uniqueNeighbors(seed, gen.k);
-        const mask = maskForIndices(neighbors);
-        gen.receivedRepair++;
-        gen.equations.push({ mask, data: cloneBytes(packet.data) });
-        maybeSolveGeneration(gen);
-        await finalizeGenerationIfComplete(gen);
-        updateProgressUI();
-      }
+  function renderGenerationCards() {
+    if (!activeSession) {
+      el.genList.innerHTML = '';
+      return;
+    }
+    const parts = [];
+    for (const gen of activeSession.generations) {
+      const pct = gen.sourceCount ? (gen.knownCount / gen.sourceCount) * 100 : 0;
+      parts.push(`
+        <div class="genItem">
+          <div class="genTitle">G${gen.gid + 1} · ${gen.knownCount}/${gen.sourceCount}</div>
+          <div class="subprogress"><div style="width:${pct.toFixed(2)}%"></div></div>
+          <div class="small" style="margin-top:6px;">repair eq: ${gen.equations.length}</div>
+        </div>`);
+    }
+    el.genList.innerHTML = parts.join('');
+  }
 
-      async function finalizeFileIfComplete() {
-        if (!state.meta || state.completedBytes.size !== state.meta.genCount) return;
+  function drawOverlay(cropRect, result) {
+    const video = el.video;
+    const ow = el.overlay.width = video.clientWidth * devicePixelRatio;
+    const oh = el.overlay.height = video.clientHeight * devicePixelRatio;
+    overlayCtx.setTransform(1,0,0,1,0,0);
+    overlayCtx.clearRect(0,0,ow,oh);
+    overlayCtx.scale(devicePixelRatio, devicePixelRatio);
+    const vw = video.clientWidth;
+    const vh = video.clientHeight;
+    if (cropRect) {
+      const x = cropRect.sx / video.videoWidth * vw;
+      const y = cropRect.sy / video.videoHeight * vh;
+      const w = cropRect.sw / video.videoWidth * vw;
+      const h = cropRect.sh / video.videoHeight * vh;
+      overlayCtx.strokeStyle = 'rgba(96,165,250,.85)';
+      overlayCtx.lineWidth = 2;
+      overlayCtx.strokeRect(x, y, w, h);
+    }
+    if (result && result.location) {
+      overlayCtx.strokeStyle = 'rgba(74,222,128,.95)';
+      overlayCtx.lineWidth = 3;
+      overlayCtx.beginPath();
+      const pts = ['topLeftCorner','topRightCorner','bottomRightCorner','bottomLeftCorner'].map(k => result.location[k]);
+      pts.forEach((p, i) => {
+        const px = ((p.x + cropRect.sx) / video.videoWidth) * vw;
+        const py = ((p.y + cropRect.sy) / video.videoHeight) * vh;
+        if (i === 0) overlayCtx.moveTo(px, py); else overlayCtx.lineTo(px, py);
+      });
+      overlayCtx.closePath();
+      overlayCtx.stroke();
+    }
+  }
+
+  function computeCropRect() {
+    const video = el.video;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return null;
+    if (el.cropMode.value === 'full') return { sx: 0, sy: 0, sw: vw, sh: vh };
+
+    const baseSide = Math.floor(Math.min(vw, vh) * 0.72);
+    const lastFresh = (performance.now() - lastSuccessAt) < 900;
+    if (lastFresh && lastDetection) {
+      const pad = 0.42;
+      const minX = Math.min(lastDetection.location.topLeftCorner.x, lastDetection.location.bottomLeftCorner.x);
+      const maxX = Math.max(lastDetection.location.topRightCorner.x, lastDetection.location.bottomRightCorner.x);
+      const minY = Math.min(lastDetection.location.topLeftCorner.y, lastDetection.location.topRightCorner.y);
+      const maxY = Math.max(lastDetection.location.bottomLeftCorner.y, lastDetection.location.bottomRightCorner.y);
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const side = Math.min(Math.max((Math.max(maxX - minX, maxY - minY)) * (1 + pad), baseSide * 0.45), Math.min(vw, vh) * 0.95);
+      const sx = Math.max(0, Math.min(vw - side, Math.round(cx - side / 2)));
+      const sy = Math.max(0, Math.min(vh - side, Math.round(cy - side / 2)));
+      return { sx, sy, sw: Math.round(side), sh: Math.round(side) };
+    }
+
+    const side = baseSide;
+    return { sx: Math.round((vw - side) / 2), sy: Math.round((vh - side) / 2), sw: side, sh: side };
+  }
+
+  function ensureWorker() {
+    if (worker) return;
+    const workerCode = `
+      self.importScripts('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js');
+      self.onmessage = (e) => {
+        const { width, height, buffer, jobId } = e.data;
         try {
-          updateStatus('各代已解码完成，正在拼接文件...');
-          const payloadTotal = state.meta.totalSourceBlocks * state.meta.blockSize;
-          const payload = new Uint8Array(payloadTotal);
-          let offset = 0;
-          for (let gid = 0; gid < state.meta.genCount; gid++) {
-            const block = state.completedBytes.get(gid);
-            payload.set(block, offset);
-            offset += block.length;
-          }
-          let merged = payload.subarray(0, state.meta.payloadSize);
-          let output = merged;
-          if (state.meta.compression === 'gzip') {
-            if ('DecompressionStream' in window) {
-              const decompressed = await new Response(new Blob([merged]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-              output = new Uint8Array(decompressed);
-            } else {
-              throw new Error('当前环境不支持 gzip 解压');
-            }
-          }
-          const finalCrc = crc32(output);
-          if (finalCrc !== state.meta.fileCrc32) {
-            el.integrityText.textContent = `整体校验失败：期望 ${state.meta.fileCrc32}，实际 ${finalCrc}`;
-            updateStatus('整体校验失败，请继续扫描更多自由度');
+          const pixels = new Uint8ClampedArray(buffer);
+          const result = self.jsQR(pixels, width, height, {
+            inversionAttempts: 'dontInvert',
+            canOverwriteImage: true
+          });
+          if (!result) {
+            self.postMessage({ jobId, ok: false });
             return;
           }
-          el.integrityText.innerHTML = '<span class="ok">整体校验通过</span>';
-          updateStatus('接收完成，开始下载');
-          downloadFile(output, state.meta.fileName, state.meta.mime);
-          stopScan();
-          updateStatus('接收完成，文件已下载');
+          const bytes = result.binaryData ? Uint8Array.from(result.binaryData) : new Uint8Array();
+          self.postMessage({
+            jobId,
+            ok: true,
+            bytes,
+            text: result.data || '',
+            location: result.location || null
+          }, [bytes.buffer]);
         } catch (err) {
-          console.error(err);
-          el.integrityText.textContent = `收尾失败：${err.message || err}`;
-          updateStatus('收尾失败，请继续扫描');
+          self.postMessage({ jobId, ok: false, error: String(err) });
         }
+      };
+    `;
+    worker = new Worker(URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' })));
+    worker.onmessage = onWorkerMessage;
+  }
+
+  function onWorkerMessage(e) {
+    decodeBusy = false;
+    const msg = e.data;
+    decodeCounter++;
+    updateSpeedBadge();
+    if (!msg.ok) {
+      drawOverlay(computeCropRect(), null);
+      return;
+    }
+    const bytes = new Uint8Array(msg.bytes);
+    lastSuccessAt = performance.now();
+    lastDetection = { location: msg.location };
+    drawOverlay(computeCropRect(), { location: msg.location });
+    stats.decodedFrames++;
+    let handled = false;
+    if (bytes.length >= 4 && bytes[0] === 0x4d && bytes[1] === 0x7c) {
+      handled = handleMeta(bytes);
+    } else if (bytes.length >= 5) {
+      handled = handlePayload(bytes);
+    }
+    if (handled) {
+      el.scanText.textContent = `raw ${bytes.length} B · ${msg.text ? '含文本视图' : '二进制'}`;
+      updateStatus(activeSession && activeSession.completed ? '接收完成' : '接收中', activeSession && activeSession.completed ? 'ok' : '');
+    }
+  }
+
+  function updateSpeedBadge() {
+    const now = performance.now();
+    const dt = (now - decodeCounterWindowStart) / 1000;
+    if (dt >= 0.8) {
+      const fps = decodeCounter / dt;
+      el.fpsText.textContent = `${fps.toFixed(1)} decode/s`;
+      decodeCounter = 0;
+      decodeCounterWindowStart = now;
+    }
+  }
+
+  async function listCameras() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videos = devices.filter(d => d.kind === 'videoinput');
+    el.cameraSelect.innerHTML = videos.map((d, i) => `<option value="${d.deviceId}">${d.label || 'Camera ' + (i + 1)}</option>`).join('');
+    if (!el.cameraSelect.value) {
+      const rear = videos.find(v => /back|rear|environment|后置/i.test(v.label));
+      if (rear) el.cameraSelect.value = rear.deviceId;
+    }
+  }
+
+  async function applyTorch(enabled) {
+    if (!track) return;
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
+    const supports = !!caps.torch;
+    el.badgeTorch.textContent = supports ? `Torch: ${enabled ? '开' : '关'}` : 'Torch: 不支持';
+    if (!supports) return;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: enabled }] });
+    } catch (err) {
+      el.badgeTorch.textContent = 'Torch: 设置失败';
+    }
+  }
+
+  async function requestWakeLock() {
+    if (!el.keepAwake.checked || !('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch (_) {}
+  }
+  async function releaseWakeLock() {
+    if (wakeLock) {
+      try { await wakeLock.release(); } catch (_) {}
+      wakeLock = null;
+    }
+  }
+
+  async function startCamera() {
+    ensureWorker();
+    if (stream) await stopCamera();
+    const preferredId = el.cameraSelect.value;
+    const constraints = {
+      audio: false,
+      video: preferredId ? {
+        deviceId: { exact: preferredId },
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30, max: 30 }
+      } : {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30, max: 30 }
       }
+    };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    el.video.srcObject = stream;
+    await el.video.play();
+    track = stream.getVideoTracks()[0] || null;
+    await listCameras();
+    await applyTorch(el.torchToggle.checked);
+    await requestWakeLock();
+    running = true;
+    el.startBtn.disabled = true;
+    el.stopBtn.disabled = false;
+    updateStatus('摄像头已启动，正在扫描');
+    scanLoop();
+  }
 
-      function downloadFile(bytes, name, mime) {
-        const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = name || 'download.bin';
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function stopCamera() {
+    running = false;
+    decodeBusy = false;
+    if (drawLoopHandle) cancelAnimationFrame(drawLoopHandle);
+    drawLoopHandle = 0;
+    if (stream) {
+      for (const t of stream.getTracks()) t.stop();
+      stream = null;
+    }
+    track = null;
+    el.video.srcObject = null;
+    el.startBtn.disabled = false;
+    el.stopBtn.disabled = true;
+    await releaseWakeLock();
+    overlayCtx.clearRect(0, 0, el.overlay.width, el.overlay.height);
+    updateStatus('已停止扫描');
+  }
+
+  function scanLoop() {
+    if (!running) return;
+    drawLoopHandle = requestAnimationFrame(scanLoop);
+    if (decodeBusy) return;
+    if (!el.video.videoWidth || !el.video.videoHeight) return;
+    const now = performance.now();
+    const minInterval = Number(el.scanInterval.value) || 0;
+    if (now - lastScanAt < minInterval) return;
+    lastScanAt = now;
+
+    const crop = computeCropRect();
+    const scanSize = Number(el.scanScale.value) || 448;
+    captureCanvas.width = scanSize;
+    captureCanvas.height = scanSize;
+    captureCtx.drawImage(el.video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, scanSize, scanSize);
+    const imageData = captureCtx.getImageData(0, 0, scanSize, scanSize);
+    decodeBusy = true;
+    frameCounter++;
+    worker.postMessage({ jobId: frameCounter, width: scanSize, height: scanSize, buffer: imageData.data.buffer }, [imageData.data.buffer]);
+    drawOverlay(crop, null);
+  }
+
+  el.startBtn.addEventListener('click', async () => {
+    try {
+      await startCamera();
+    } catch (err) {
+      updateStatus(`启动失败：${err.message || err}`, 'dangerText');
+    }
+  });
+
+  el.stopBtn.addEventListener('click', () => { stopCamera(); });
+  el.resetBtn.addEventListener('click', resetSession);
+  el.torchToggle.addEventListener('change', () => { applyTorch(el.torchToggle.checked); });
+  el.cameraSelect.addEventListener('change', async () => {
+    if (running) {
+      try { await startCamera(); } catch (err) { updateStatus(`切换摄像头失败：${err.message || err}`, 'dangerText'); }
+    }
+  });
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && running) await requestWakeLock();
+  });
+
+  async function init() {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        updateStatus('当前浏览器不支持 getUserMedia', 'dangerText');
+        return;
       }
+      await navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(s => { s.getTracks().forEach(t => t.stop()); }).catch(() => {});
+      await listCameras();
+      el.badgeDetector.textContent = '解码器：jsQR Worker（保留二进制）';
+      updateStatus('准备就绪');
+    } catch (err) {
+      updateStatus(`初始化失败：${err.message || err}`, 'dangerText');
+    }
+  }
 
-      function updateProgressUI() {
-        if (!state.meta) {
-          el.progressText.textContent = '0 / 0';
-          el.progressBar.style.width = '0%';
-          el.decodeText.textContent = '-';
-          el.missingText.textContent = '未完成代：-';
-          return;
-        }
-        const complete = state.completedBytes.size;
-        el.progressText.textContent = `${complete} / ${state.meta.genCount}`;
-        el.progressBar.style.width = `${state.meta.genCount > 0 ? (complete / state.meta.genCount) * 100 : 0}%`;
-        const detail = [];
-        const missing = [];
-        for (let gid = 0; gid < state.meta.genCount; gid++) {
-          const gen = getGeneration(gid);
-          const known = gen.known.filter(Boolean).length;
-          detail.push(`G${gid + 1}:${known}/${gen.k}+eq${gen.equations.length}`);
-          if (!gen.decoded) missing.push(`G${gid + 1}`);
-        }
-        el.decodeText.textContent = detail.slice(0, 10).join(' · ') + (detail.length > 10 ? ' ...' : '');
-        el.missingText.textContent = `未完成代：${missing.length ? missing.join(', ') : '无'}`;
-      }
-
-      async function listCameras() {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const cams = devices.filter(d => d.kind === 'videoinput');
-          el.cameraSelect.innerHTML = '';
-          cams.forEach((cam, idx) => {
-            const opt = document.createElement('option');
-            opt.value = cam.deviceId;
-            opt.textContent = cam.label || `Camera ${idx + 1}`;
-            el.cameraSelect.appendChild(opt);
-          });
-          if (!cams.length) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = '未发现摄像头';
-            el.cameraSelect.appendChild(opt);
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      }
-
-      async function openCamera() {
-        try {
-          stopScan();
-          if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-          const deviceId = el.cameraSelect.value;
-
-          const constraints = {
-            video: deviceId ? {
-              deviceId: { exact: deviceId },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              frameRate: { ideal: 30, max: 60 }
-            } : {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              frameRate: { ideal: 30, max: 60 }
-            },
-            audio: false
-          };
-
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          videoTrack = stream.getVideoTracks()[0] || null;
-
-          try {
-            const caps = videoTrack?.getCapabilities?.() || {};
-            if (caps.focusMode && caps.focusMode.includes('continuous')) {
-              await videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-            }
-          } catch (e) {}
-
-          el.video.srcObject = stream;
-          await el.video.play();
-          await sleep(300);
-
-          syncOverlayCanvas();
-          torchOn = false;
-          el.torchBtn.disabled = !(videoTrack && videoTrack.getCapabilities && videoTrack.getCapabilities().torch);
-          el.torchBtn.textContent = '补光灯';
-
-          resetState(true);
-          el.startScanBtn.disabled = !detectorReady;
-          updateStatus('摄像头已打开，可以开始接收');
-        } catch (err) {
-          console.error(err);
-          updateStatus(`打开摄像头失败：${err.message || err}`);
-        }
-      }
-
-      function syncOverlayCanvas() {
-        const rect = el.video.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        el.overlay.width = Math.max(1, Math.floor(rect.width * dpr));
-        el.overlay.height = Math.max(1, Math.floor(rect.height * dpr));
-      }
-
-      function clearOverlay() {
-        syncOverlayCanvas();
-        overlayCtx.clearRect(0, 0, el.overlay.width, el.overlay.height);
-      }
-
-      function drawOverlayBox(boxVideo, color = '#22c55e') {
-        syncOverlayCanvas();
-        overlayCtx.clearRect(0, 0, el.overlay.width, el.overlay.height);
-        if (!boxVideo || !el.video.videoWidth || !el.video.videoHeight) return;
-
-        const rect = el.video.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
-        const scaleX = (rect.width * dpr) / el.video.videoWidth;
-        const scaleY = (rect.height * dpr) / el.video.videoHeight;
-
-        overlayCtx.strokeStyle = color;
-        overlayCtx.lineWidth = Math.max(2, 2 * dpr);
-        overlayCtx.strokeRect(
-          boxVideo.x * scaleX,
-          boxVideo.y * scaleY,
-          boxVideo.w * scaleX,
-          boxVideo.h * scaleY
-        );
-      }
-
-      function createWorker() {
-        const workerCode = `
-          let ready = false;
-          self.importScripts('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js');
-          ready = true;
-          self.postMessage({ type: 'ready' });
-
-          self.onmessage = (e) => {
-            const msg = e.data;
-            if (!ready || msg.type !== 'decode') return;
-            const { id, rawBuffer, width, height, region, submittedAt, mode } = msg;
-            try {
-              const data = new Uint8ClampedArray(rawBuffer);
-              const code = jsQR(data, width, height, { inversionAttempts: 'dontInvert' }) ||
-                           jsQR(data, width, height, { inversionAttempts: 'attemptBoth' });
-              if (!code) {
-                self.postMessage({ type: 'result', id, found: false, submittedAt, mode });
-                return;
-              }
-              self.postMessage({
-                type: 'result',
-                id,
-                found: true,
-                submittedAt,
-                mode,
-                raw: typeof code.data === 'string' ? code.data : '',
-                binaryData: code.binaryData ? new Uint8Array(code.binaryData) : null,
-                location: code.location || null,
-                region
-              });
-            } catch (err) {
-              self.postMessage({ type: 'result', id, found: false, submittedAt, mode, error: String(err) });
-            }
-          };
-        `;
-        const blob = new Blob([workerCode], { type: 'application/javascript' });
-        const url = URL.createObjectURL(blob);
-        worker = new Worker(url);
-        worker.onmessage = onWorkerMessage;
-        worker.onerror = (err) => {
-          console.error(err);
-          el.engineText.textContent = 'Worker 初始化失败';
-          updateStatus('扫描引擎启动失败');
-        };
-      }
-
-      function onWorkerMessage(e) {
-        const msg = e.data || {};
-        if (msg.type === 'ready') {
-          detectorReady = true;
-          el.engineText.textContent = `jsQR Worker${hasVFC ? ' + rVFC' : ' + rAF'}`;
-          if (stream) el.startScanBtn.disabled = false;
-          return;
-        }
-        if (msg.type !== 'result') return;
-
-        inflight = false;
-        rememberEvent(state.frameStats.decodeTimes, now());
-        if (msg.submittedAt) {
-          state.frameStats.decodeLatencies.push(now() - msg.submittedAt);
-          if (state.frameStats.decodeLatencies.length > 40) state.frameStats.decodeLatencies.shift();
-        }
-        updateMetrics();
-
-        if (!scanLoopActive) return;
-
-        if (!msg.found) {
-          state.missCount++;
-          if (state.missCount > Number(el.fallbackFrames.value || 8)) {
-            state.lastBoxVideo = null;
-            clearOverlay();
-          }
-          return;
-        }
-
-        el.lastScanText.textContent = new Date().toLocaleTimeString();
-
-        const fp = msg.raw
-          ? `T:${msg.raw}`
-          : `B:${Array.from(msg.binaryData || []).slice(0, 24).join(',')}:${(msg.binaryData || []).length}`;
-
-        if (sameFingerprint(fp)) return;
-
-        state.missCount = 0;
-
-        if (msg.location && msg.region) {
-          const box = locationToVideoBox(msg.location, msg.region);
-          if (box) {
-            state.lastBoxVideo = smoothBox(state.lastBoxVideo, box);
-            drawOverlayBox(state.lastBoxVideo);
-          }
-        }
-
-        const packet = parsePacket(msg.raw, msg.binaryData);
-        if (!packet) return;
-
-        if (packet.type === 'meta') ensureMeta(packet);
-        else if (packet.type === 'systematic') handleSystematic(packet);
-        else if (packet.type === 'repair') handleRepair(packet);
-
-        el.frameText.textContent = packet.type === 'meta' ? 'Meta' : `${packet.type} G${packet.gid + 1}`;
-      }
-
-      function smoothBox(prev, next) {
-        if (!prev) return next;
-        const a = 0.65;
-        return {
-          x: prev.x * a + next.x * (1 - a),
-          y: prev.y * a + next.y * (1 - a),
-          w: prev.w * a + next.w * (1 - a),
-          h: prev.h * a + next.h * (1 - a),
-        };
-      }
-
-      function locationToVideoBox(loc, region) {
-        if (!loc) return null;
-        const pts = [
-          loc.topLeftCorner, loc.topRightCorner, loc.bottomLeftCorner, loc.bottomRightCorner
-        ].filter(Boolean);
-        if (!pts.length) return null;
-        const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-        const minX = Math.min(...xs), maxX = Math.max(...xs);
-        const minY = Math.min(...ys), maxY = Math.max(...ys);
-        return {
-          x: region.sx + (minX / region.dw) * region.sw,
-          y: region.sy + (minY / region.dh) * region.sh,
-          w: ((maxX - minX) / region.dw) * region.sw,
-          h: ((maxY - minY) / region.dh) * region.sh,
-        };
-      }
-
-      function buildScanRegion() {
-        const videoW = el.video.videoWidth || 0;
-        const videoH = el.video.videoHeight || 0;
-        if (!videoW || !videoH) return null;
-
-        const fullEdge = clamp(Number(el.globalMaxEdge.value) || 720, 320, 1280);
-        const roiEdge = clamp(Number(el.roiMaxEdge.value) || 900, 320, 1280);
-        const fallbackFrames = clamp(Number(el.fallbackFrames.value) || 8, 2, 30);
-
-        if (!state.lastBoxVideo || state.missCount > fallbackFrames) {
-          const scale = Math.min(1, fullEdge / Math.max(videoW, videoH));
-          return {
-            mode: 'full',
-            sx: 0, sy: 0, sw: videoW, sh: videoH,
-            dw: Math.max(1, Math.round(videoW * scale)),
-            dh: Math.max(1, Math.round(videoH * scale))
-          };
-        }
-
-        const padX = state.lastBoxVideo.w * 0.40;
-        const padY = state.lastBoxVideo.h * 0.40;
-        const sx = clamp(Math.floor(state.lastBoxVideo.x - padX), 0, videoW - 1);
-        const sy = clamp(Math.floor(state.lastBoxVideo.y - padY), 0, videoH - 1);
-        const ex = clamp(Math.ceil(state.lastBoxVideo.x + state.lastBoxVideo.w + padX), sx + 1, videoW);
-        const ey = clamp(Math.ceil(state.lastBoxVideo.y + state.lastBoxVideo.h + padY), sy + 1, videoH);
-        const sw = ex - sx;
-        const sh = ey - sy;
-        const scale = Math.min(1, roiEdge / Math.max(sw, sh));
-        return {
-          mode: 'roi',
-          sx, sy, sw, sh,
-          dw: Math.max(1, Math.round(sw * scale)),
-          dh: Math.max(1, Math.round(sh * scale))
-        };
-      }
-
-      function captureAndSubmit() {
-        if (!scanLoopActive || inflight || !worker || !detectorReady) return;
-        const t = now();
-        const minInterval = clamp(Number(el.decodeInterval.value) || 22, 10, 100);
-        if (t - state.lastSubmitAt < minInterval) return;
-        if (!el.video.videoWidth || !el.video.videoHeight) return;
-
-        const region = buildScanRegion();
-        if (!region) return;
-
-        captureCanvas.width = region.dw;
-        captureCanvas.height = region.dh;
-        captureCtx.drawImage(el.video, region.sx, region.sy, region.sw, region.sh, 0, 0, region.dw, region.dh);
-
-        let image;
-        try {
-          image = captureCtx.getImageData(0, 0, region.dw, region.dh);
-        } catch (err) {
-          console.error(err);
-          return;
-        }
-
-        inflight = true;
-        state.lastSubmitAt = t;
-        state.pendingMode = region.mode;
-        rememberEvent(state.frameStats.submitTimes, t);
-        updateMetrics();
-
-        el.scanModeText.textContent = region.mode === 'roi'
-          ? `ROI ${region.sw}×${region.sh} → ${region.dw}×${region.dh}`
-          : `全图 ${region.sw}×${region.sh} → ${region.dw}×${region.dh}`;
-
-        worker.postMessage({
-          type: 'decode',
-          id: ++requestId,
-          rawBuffer: image.data.buffer,
-          width: image.width,
-          height: image.height,
-          region,
-          submittedAt: t,
-          mode: region.mode
-        }, [image.data.buffer]);
-      }
-
-      function scanTick() {
-        if (!scanLoopActive) return;
-        captureAndSubmit();
-        if (hasVFC) {
-          el.video.requestVideoFrameCallback(() => scanTick());
-        } else {
-          requestAnimationFrame(() => scanTick());
-        }
-      }
-
-      function startScan() {
-        if (!stream || !detectorReady || scanLoopActive) return;
-        scanLoopActive = true;
-        el.startScanBtn.disabled = true;
-        el.stopScanBtn.disabled = false;
-        updateStatus('扫描中，请将二维码稳定置于画面中央');
-        scanTick();
-      }
-
-      function stopScan() {
-        scanLoopActive = false;
-        inflight = false;
-        el.stopScanBtn.disabled = true;
-        el.startScanBtn.disabled = !stream || !detectorReady;
-      }
-
-      async function toggleTorch() {
-        try {
-          if (!videoTrack) return;
-          const caps = videoTrack.getCapabilities?.();
-          if (!caps || !caps.torch) return;
-          torchOn = !torchOn;
-          await videoTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
-          el.torchBtn.textContent = torchOn ? '关闭补光灯' : '补光灯';
-        } catch (err) {
-          console.error(err);
-          updateStatus(`补光灯切换失败：${err.message || err}`);
-        }
-      }
-
-      window.addEventListener('resize', () => {
-        syncOverlayCanvas();
-        if (state.lastBoxVideo) drawOverlayBox(state.lastBoxVideo);
-      });
-
-      el.openCameraBtn.addEventListener('click', async () => { await openCamera(); await listCameras(); });
-      el.startScanBtn.addEventListener('click', startScan);
-      el.stopScanBtn.addEventListener('click', stopScan);
-      el.resetBtn.addEventListener('click', () => { stopScan(); resetState(!!stream); });
-      el.torchBtn.addEventListener('click', toggleTorch);
-      el.cameraSelect.addEventListener('change', async () => { if (stream) { await openCamera(); } });
-
-      (async () => {
-        createWorker();
-        if (navigator.mediaDevices?.addEventListener) navigator.mediaDevices.addEventListener('devicechange', listCameras);
-        await listCameras();
-      })();
-    })();
-  </script>
+  init();
+})();
+</script>
 </body>
 </html>
