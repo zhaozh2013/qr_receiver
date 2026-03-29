@@ -33,13 +33,14 @@
     .warn { color:var(--warn); }
     .missing { font-size:12px; color:var(--muted); word-break:break-all; max-height:90px; overflow:auto; border-top:1px dashed var(--line); margin-top:10px; padding-top:10px; }
   </style>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 <body>
   <div class="app">
     <div class="card stack">
       <div>
-        <h1>二维码离线收件（系统型 Fountain 版 / 二进制载荷实验）</h1>
-        <p class="muted">接收端不再等待“下一轮补齐某个编号”，而是把系统块与 XOR 修复块都当成自由度，按代解码。该实验版保留文本 Meta，但系统块与修复块改为二进制载荷，不再使用 base64url(data)。</p>
+        <h1>二维码离线收件（系统型 Fountain 版 / Byte Mode 集成版）</h1>
+        <p class="muted">接收端不再等待“下一轮补齐某个编号”，而是把系统块与 XOR 修复块都当成自由度，按代解码。该版本保留文本 Meta，系统块与修复块通过 jsQR 读取原始二进制 payload。</p>
       </div>
 
       <select id="cameraSelect"></select>
@@ -66,7 +67,7 @@
         <p><strong>整体校验：</strong><span id="integrityText">-</span></p>
         <p><strong>最后扫码：</strong><span id="lastScanText">-</span></p>
         <div id="missingText" class="missing">未完成代：-</div>
-        <p class="small">最佳效果依赖较新的 Android Chrome 和 BarcodeDetector。该实验版用文本 Meta + 二进制载荷减少单帧开销；是否获得全部收益取决于本地二维码库与扫码器对 byte-mode 的支持。解码器先做 peeling，再对剩余小残差做 GF(2) 高斯消元。</p>
+        <p class="small">最佳效果依赖较新的 Android Chrome。该版不依赖 BarcodeDetector，而是使用 jsQR 直接读取字节级 payload；解码器先做 peeling，再对剩余小残差做 GF(2) 高斯消元。</p>
       </div>
     </div>
   </div>
@@ -243,18 +244,11 @@
         for (const i of indices) mask |= (1n << BigInt(i));
         return mask;
       }
-      function binaryStringToBytes(str) {
-        const out = new Uint8Array(str.length);
-        for (let i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0xFF;
-        return out;
-      }
       function getU16BE(arr, offset) {
         return ((arr[offset] << 8) | arr[offset + 1]) >>> 0;
       }
-      function parsePacket(raw) {
-        if (!raw || typeof raw !== 'string') return null;
-
-        if (raw[0] === 'M') {
+      function parsePacket(raw, binaryData) {
+        if (typeof raw === 'string' && raw.startsWith('M|')) {
           const parts = raw.split('|');
           if (parts[0] === 'M' && parts.length === 19) {
             return {
@@ -281,11 +275,11 @@
           }
           return null;
         }
-
-        const bytes = binaryStringToBytes(raw);
-        if (bytes.length < 5) return null;
-        const typeByte = bytes[0];
-        if (typeByte === 0x53) {
+        const bytes = binaryData instanceof Uint8ClampedArray || binaryData instanceof Uint8Array
+          ? new Uint8Array(binaryData)
+          : (typeof raw === 'string' ? Uint8Array.from(raw, ch => ch.charCodeAt(0) & 0xFF) : null);
+        if (!bytes || bytes.length < 5) return null;
+        if (bytes[0] === 0x53) {
           return {
             type: 'systematic',
             gid: getU16BE(bytes, 1),
@@ -293,7 +287,7 @@
             data: bytes.slice(5),
           };
         }
-        if (typeByte === 0x45) {
+        if (bytes[0] === 0x45) {
           return {
             type: 'repair',
             gid: getU16BE(bytes, 1),
@@ -579,22 +573,18 @@
         }
       }
       async function initDetector() {
-        if ('BarcodeDetector' in window) {
-          const formats = await BarcodeDetector.getSupportedFormats().catch(() => []);
-          if (formats.includes('qr_code')) {
-            detector = new BarcodeDetector({ formats: ['qr_code'] });
-            el.engineText.textContent = 'BarcodeDetector';
-            return;
-          }
-        }
-        throw new Error('当前环境不支持 BarcodeDetector。请使用较新的 Android Chrome。');
+        detector = { name: 'jsQR' };
+        el.engineText.textContent = 'jsQR';
       }
       async function detectOneFrame() {
         ctx.drawImage(el.video, 0, 0, canvas.width, canvas.height);
-        const codes = await detector.detect(canvas);
-        if (!codes || !codes.length) return null;
-        const raw = codes[0].rawValue;
-        return (raw && typeof raw === 'string') ? raw : null;
+        const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'attemptBoth' });
+        if (!code) return null;
+        return {
+          raw: typeof code.data === 'string' ? code.data : '',
+          binaryData: code.binaryData ? new Uint8Array(code.binaryData) : null
+        };
       }
       async function startScan() {
         if (!stream || !detector || scanLoopActive) return;
@@ -607,10 +597,11 @@
 
         while (scanLoopActive && myRunId === runId) {
           try {
-            const raw = await detectOneFrame();
-            if (raw && !sameFingerprint(raw)) {
+            const detected = await detectOneFrame();
+            const fp = detected ? (detected.raw ? `T:${detected.raw}` : `B:${Array.from(detected.binaryData || []).slice(0, 16).join(',')}:${(detected.binaryData || []).length}`) : '';
+            if (detected && fp && !sameFingerprint(fp)) {
               el.lastScanText.textContent = new Date().toLocaleTimeString();
-              const packet = parsePacket(raw);
+              const packet = parsePacket(detected.raw, detected.binaryData);
               if (packet) {
                 if (packet.type === 'meta') ensureMeta(packet);
                 else if (packet.type === 'systematic') await handleSystematic(packet);
