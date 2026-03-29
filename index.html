@@ -107,7 +107,7 @@
         <div class="status">
           <div class="statusBox">
             <div class="kv">
-              <div>状态</div><div id="statusText">等待开始</div>
+              <div>状态</div><div id="statusText">等待开始（先锁定 Meta）</div>
               <div>会话</div><div id="sessionText" class="mono">-</div>
               <div>文件</div><div id="fileText">-</div>
               <div>压缩</div><div id="compressionText">-</div>
@@ -539,7 +539,7 @@
       el.badgeSession.textContent = `会话 ${meta.sessionId}`;
       stats = { duplicates: 0, repairs: 0, decodedFrames: 0 };
       renderGenerationCards();
-      updateStatus('已获取 Meta，开始接收数据', 'ok');
+      updateStatus('已锁定会话 Meta，开始接收数据', 'ok');
     }
     return true;
   }
@@ -694,7 +694,7 @@
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
-    if (el.cropMode.value === 'full') return { sx: 0, sy: 0, sw: vw, sh: vh };
+    if (el.cropMode.value === 'full' || !activeSession) return { sx: 0, sy: 0, sw: vw, sh: vh };
 
     const baseSide = Math.floor(Math.min(vw, vh) * 0.72);
     const lastFresh = (performance.now() - lastSuccessAt) < 900;
@@ -758,19 +758,20 @@
       drawOverlay(computeCropRect(), null);
       return;
     }
-    const bytes = new Uint8Array(msg.bytes);
+    const bytes = new Uint8Array(msg.bytes || []);
+    const text = typeof msg.text === 'string' ? msg.text : '';
     lastSuccessAt = performance.now();
     lastDetection = { location: msg.location };
     drawOverlay(computeCropRect(), { location: msg.location });
     stats.decodedFrames++;
     let handled = false;
-    if (bytes.length >= 4 && bytes[0] === 0x4d && bytes[1] === 0x7c) {
-      handled = handleMeta(bytes);
+    if ((bytes.length >= 4 && bytes[0] === 0x4d && bytes[1] === 0x7c) || text.startsWith('M|2|')) {
+      handled = handleMeta((bytes.length >= 4 && bytes[0] === 0x4d && bytes[1] === 0x7c) ? bytes : new TextEncoder().encode(text));
     } else if (bytes.length >= 5) {
       handled = handlePayload(bytes);
     }
     if (handled) {
-      el.scanText.textContent = `raw ${bytes.length} B · ${msg.text ? '含文本视图' : '二进制'}`;
+      el.scanText.textContent = `raw ${bytes.length} B · ${text ? '含文本视图' : '二进制'}`;
       updateStatus(activeSession && activeSession.completed ? '接收完成' : '接收中', activeSession && activeSession.completed ? 'ok' : '');
     }
   }
@@ -884,7 +885,8 @@
     lastScanAt = now;
 
     const crop = computeCropRect();
-    const scanSize = Number(el.scanScale.value) || 448;
+    const uiScanSize = Number(el.scanScale.value) || 448;
+    const scanSize = activeSession ? uiScanSize : Math.max(uiScanSize, 512);
     captureCanvas.width = scanSize;
     captureCanvas.height = scanSize;
     captureCtx.drawImage(el.video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, scanSize, scanSize);
