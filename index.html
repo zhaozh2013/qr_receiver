@@ -38,8 +38,8 @@
   <div class="app">
     <div class="card stack">
       <div>
-        <h1>二维码离线收件（系统型 Fountain 版 / 协议瘦身）</h1>
-        <p class="muted">接收端不再等待“下一轮补齐某个编号”，而是把系统块与 XOR 修复块都当成自由度，按代解码。该版本支持瘦身协议：数据帧省略 sessionId，repair 帧省略显式 seed。</p>
+        <h1>二维码离线收件（系统型 Fountain 版 / 二进制载荷实验）</h1>
+        <p class="muted">接收端不再等待“下一轮补齐某个编号”，而是把系统块与 XOR 修复块都当成自由度，按代解码。该实验版保留文本 Meta，但系统块与修复块改为二进制载荷，不再使用 base64url(data)。</p>
       </div>
 
       <select id="cameraSelect"></select>
@@ -66,7 +66,7 @@
         <p><strong>整体校验：</strong><span id="integrityText">-</span></p>
         <p><strong>最后扫码：</strong><span id="lastScanText">-</span></p>
         <div id="missingText" class="missing">未完成代：-</div>
-        <p class="small">最佳效果依赖较新的 Android Chrome 和 BarcodeDetector。该版使用瘦身协议以减少单帧头部开销；解码器先做 peeling，再对剩余小残差做 GF(2) 高斯消元。</p>
+        <p class="small">最佳效果依赖较新的 Android Chrome 和 BarcodeDetector。该实验版用文本 Meta + 二进制载荷减少单帧开销；是否获得全部收益取决于本地二维码库与扫码器对 byte-mode 的支持。解码器先做 peeling，再对剩余小残差做 GF(2) 高斯消元。</p>
       </div>
     </div>
   </div>
@@ -243,46 +243,62 @@
         for (const i of indices) mask |= (1n << BigInt(i));
         return mask;
       }
+      function binaryStringToBytes(str) {
+        const out = new Uint8Array(str.length);
+        for (let i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0xFF;
+        return out;
+      }
+      function getU16BE(arr, offset) {
+        return ((arr[offset] << 8) | arr[offset + 1]) >>> 0;
+      }
       function parsePacket(raw) {
         if (!raw || typeof raw !== 'string') return null;
-        const parts = raw.split('|');
-        if (parts[0] === 'M' && parts.length === 19) {
-          return {
-            type: 'meta',
-            version: parts[1],
-            sessionId: parts[2],
-            fileName: base64UrlToText(parts[3]),
-            mime: base64UrlToText(parts[4]),
-            originalSize: b36ToInt(parts[5]),
-            payloadSize: b36ToInt(parts[6]),
-            compression: parts[7] === '1' ? 'gzip' : 'none',
-            blockSize: b36ToInt(parts[8]),
-            generationK: b36ToInt(parts[9]),
-            totalSourceBlocks: b36ToInt(parts[10]),
-            genCount: b36ToInt(parts[11]),
-            lastGenSourceCount: b36ToInt(parts[12]),
-            fileCrc32: parts[13],
-            frameDelay: b36ToInt(parts[14]),
-            metaEvery: b36ToInt(parts[15]),
-            systematicWeight: b36ToInt(parts[16]),
-            repairWeight: b36ToInt(parts[17]),
-            sessionSalt: b36ToInt(parts[18]) >>> 0,
-          };
+
+        if (raw[0] === 'M') {
+          const parts = raw.split('|');
+          if (parts[0] === 'M' && parts.length === 19) {
+            return {
+              type: 'meta',
+              version: parts[1],
+              sessionId: parts[2],
+              fileName: base64UrlToText(parts[3]),
+              mime: base64UrlToText(parts[4]),
+              originalSize: b36ToInt(parts[5]),
+              payloadSize: b36ToInt(parts[6]),
+              compression: parts[7] === '1' ? 'gzip' : 'none',
+              blockSize: b36ToInt(parts[8]),
+              generationK: b36ToInt(parts[9]),
+              totalSourceBlocks: b36ToInt(parts[10]),
+              genCount: b36ToInt(parts[11]),
+              lastGenSourceCount: b36ToInt(parts[12]),
+              fileCrc32: parts[13],
+              frameDelay: b36ToInt(parts[14]),
+              metaEvery: b36ToInt(parts[15]),
+              systematicWeight: b36ToInt(parts[16]),
+              repairWeight: b36ToInt(parts[17]),
+              sessionSalt: b36ToInt(parts[18]) >>> 0,
+            };
+          }
+          return null;
         }
-        if (parts[0] === 'S' && parts.length === 4) {
+
+        const bytes = binaryStringToBytes(raw);
+        if (bytes.length < 5) return null;
+        const typeByte = bytes[0];
+        if (typeByte === 0x53) {
           return {
             type: 'systematic',
-            gid: b36ToInt(parts[1]),
-            esi: b36ToInt(parts[2]),
-            data: fromBase64Url(parts[3]),
+            gid: getU16BE(bytes, 1),
+            esi: getU16BE(bytes, 3),
+            data: bytes.slice(5),
           };
         }
-        if (parts[0] === 'E' && parts.length === 4) {
+        if (typeByte === 0x45) {
           return {
             type: 'repair',
-            gid: b36ToInt(parts[1]),
-            esi: b36ToInt(parts[2]),
-            data: fromBase64Url(parts[3]),
+            gid: getU16BE(bytes, 1),
+            esi: getU16BE(bytes, 3),
+            data: bytes.slice(5),
           };
         }
         return null;
