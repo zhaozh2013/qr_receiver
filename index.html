@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>QR File Receiver</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --primary: #111827;
+      --danger: #b91c1c;
+      --ok: #065f46;
+      --warn: #92400e;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { min-height: 100dvh; }
+    .app { max-width: 900px; margin: 0 auto; padding: 12px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.04); }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    p { margin: 6px 0; line-height: 1.45; }
+    .muted { color: var(--muted); }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    button, select { appearance: none; font-size: 15px; }
+    button {
+      border: 1px solid var(--primary); background: var(--primary); color: #fff;
+      padding: 10px 14px; border-radius: 12px; cursor: pointer;
+    }
+    button.secondary { background: #fff; color: var(--primary); }
+    button.danger { background: var(--danger); border-color: var(--danger); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 12px; background: #fff; margin-top: 10px;
+    }
+    .stack { display: grid; gap: 12px; }
+    video {
+      width: 100%; border: 1px solid var(--line); border-radius: 16px; background: #000;
+      aspect-ratio: 3 / 4; object-fit: cover;
+    }
+    .status {
+      padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fafafa;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+    .progressWrap {
+      width: 100%; height: 14px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin: 10px 0 8px;
+    }
+    .progressBar { height: 100%; width: 0%; background: #111827; transition: width .12s linear; }
+    .missing { font-size: 12px; color: var(--muted); word-break: break-all; max-height: 90px; overflow: auto; border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 10px; }
+    .small { font-size: 12px; color: var(--muted); }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .hint { padding: 10px 12px; border-radius: 12px; background: #eef2ff; border: 1px solid #c7d2fe; }
+    .hide { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card stack">
+      <div>
+        <h1>二维码离线收件</h1>
+        <p class="muted">安卓 + Chrome PWA。仅保留接收功能。首次联网安装后，可离线打开并扫描发送端二维码。</p>
+      </div>
+
+      <div id="installHint" class="hint hide">
+        <strong>可安装：</strong> 点击浏览器菜单里的“安装应用”或“添加到主屏幕”。首次安装与缓存需联网一次。
+      </div>
+
+      <select id="cameraSelect"></select>
+
+      <div class="controls">
+        <button id="installBtn" class="secondary hide">安装应用</button>
+        <button id="openCameraBtn">打开摄像头</button>
+        <button id="startScanBtn" disabled>开始接收</button>
+        <button id="stopScanBtn" class="danger" disabled>停止</button>
+        <button id="resetBtn" class="secondary">重置</button>
+      </div>
+
+      <video id="video" muted autoplay playsinline></video>
+
+      <div class="status">
+        <p><strong>状态：</strong><span id="statusText">请先打开摄像头</span></p>
+        <p><strong>运行模式：</strong><span id="modeText">PWA / 离线缓存</span></p>
+        <p><strong>扫描引擎：</strong><span id="engineText">-</span></p>
+        <p><strong>传输ID：</strong><span id="transferId" class="mono">-</span></p>
+        <p><strong>文件：</strong><span id="fileInfo">-</span></p>
+        <p><strong>压缩：</strong><span id="compressionInfo">-</span></p>
+        <p><strong>接收进度：</strong><span id="progressText">0 / 0</span></p>
+        <div class="progressWrap"><div id="progressBar" class="progressBar"></div></div>
+        <p><strong>整体校验：</strong><span id="integrityText">-</span></p>
+        <p><strong>最后扫码：</strong><span id="lastScanText">-</span></p>
+        <div id="missingText" class="missing">缺失分片：-</div>
+        <p class="small">建议发件端从 200~240 字节分片、220~320ms 帧间隔开始测试。识别率不足时优先增大帧间隔。</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const el = {
+        installHint: document.getElementById('installHint'),
+        installBtn: document.getElementById('installBtn'),
+        cameraSelect: document.getElementById('cameraSelect'),
+        openCameraBtn: document.getElementById('openCameraBtn'),
+        startScanBtn: document.getElementById('startScanBtn'),
+        stopScanBtn: document.getElementById('stopScanBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        video: document.getElementById('video'),
+        statusText: document.getElementById('statusText'),
+        modeText: document.getElementById('modeText'),
+        engineText: document.getElementById('engineText'),
+        transferId: document.getElementById('transferId'),
+        fileInfo: document.getElementById('fileInfo'),
+        compressionInfo: document.getElementById('compressionInfo'),
+        progressText: document.getElementById('progressText'),
+        progressBar: document.getElementById('progressBar'),
+        integrityText: document.getElementById('integrityText'),
+        lastScanText: document.getElementById('lastScanText'),
+        missingText: document.getElementById('missingText'),
+      };
+
+      let deferredInstallPrompt = null;
+      let stream = null;
+      let detector = null;
+      let scanLoopActive = false;
+      let runId = 0;
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+      const state = {
+        session: null,
+        chunks: new Map(),
+        lastPacketFingerprint: '',
+        lastScanAt: 0,
+      };
+
+      async function registerServiceWorker() {
+        if (!('serviceWorker' in navigator)) return;
+        try {
+          await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
+        } catch (err) {
+          console.error('SW register failed:', err);
+        }
+      }
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        el.installHint.classList.remove('hide');
+        el.installBtn.classList.remove('hide');
+      });
+
+      el.installBtn.addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice.catch(() => null);
+        deferredInstallPrompt = null;
+        el.installBtn.classList.add('hide');
+      });
+
+      function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+      function formatBytes(n) {
+        if (!Number.isFinite(n)) return '-';
+        const units = ['B', 'KB', 'MB', 'GB']; let i = 0; let value = n;
+        while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+        return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
+      }
+      function b36ToInt(s) { return parseInt(s, 36); }
+      function fromBase64Url(s) {
+        s = s.replace(/-/g, '+').replace(/_/g, '/');
+        while (s.length % 4) s += '=';
+        const bin = atob(s);
+        const out = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+        return out;
+      }
+      function base64UrlToText(s) { return new TextDecoder().decode(fromBase64Url(s)); }
+      function makeCRCTable() {
+        const table = new Uint32Array(256);
+        for (let i = 0; i < 256; i++) {
+          let c = i;
+          for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+          table[i] = c >>> 0;
+        }
+        return table;
+      }
+      const CRC_TABLE = makeCRCTable();
+      function crc32(uint8) {
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < uint8.length; i++) crc = CRC_TABLE[(crc ^ uint8[i]) & 0xFF] ^ (crc >>> 8);
+        return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).padStart(8, '0');
+      }
+      function updateStatus(text) { el.statusText.textContent = text; }
+      function resetState(keepCamera = true) {
+        state.session = null; state.chunks.clear(); state.lastPacketFingerprint = ''; state.lastScanAt = 0;
+        el.transferId.textContent = '-'; el.fileInfo.textContent = '-'; el.compressionInfo.textContent = '-';
+        el.progressText.textContent = '0 / 0'; el.progressBar.style.width = '0%'; el.integrityText.textContent = '-';
+        el.lastScanText.textContent = '-'; el.missingText.textContent = '缺失分片：-';
+        updateStatus(keepCamera ? '摄像头已就绪，可以开始接收' : '请先打开摄像头');
+      }
+      function updateProgressUI() {
+        if (!state.session) {
+          el.progressText.textContent = '0 / 0'; el.progressBar.style.width = '0%'; el.missingText.textContent = '缺失分片：-'; return;
+        }
+        const total = state.session.totalChunks, got = state.chunks.size;
+        el.progressText.textContent = `${got} / ${total}`;
+        el.progressBar.style.width = `${total > 0 ? (got / total) * 100 : 0}%`;
+        if (got === total) { el.missingText.textContent = '缺失分片：无'; return; }
+        const missing = [];
+        for (let i = 0; i < total; i++) {
+          if (!state.chunks.has(i)) missing.push(i);
+          if (missing.length >= 80) { missing.push('...'); break; }
+        }
+        el.missingText.textContent = `缺失分片：${missing.join(', ') || '-'}`;
+      }
+
+      async function listCameras() {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const cams = devices.filter(d => d.kind === 'videoinput');
+          el.cameraSelect.innerHTML = '';
+          cams.forEach((cam, idx) => {
+            const opt = document.createElement('option');
+            opt.value = cam.deviceId;
+            opt.textContent = cam.label || `Camera ${idx + 1}`;
+            el.cameraSelect.appendChild(opt);
+          });
+          if (!cams.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '未发现摄像头';
+            el.cameraSelect.appendChild(opt);
+          }
+        } catch (err) { console.error(err); }
+      }
+
+      async function openCamera() {
+        try {
+          if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+          const deviceId = el.cameraSelect.value;
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } },
+            audio: false,
+          });
+          el.video.srcObject = stream;
+          await el.video.play();
+          await sleep(300);
+          canvas.width = el.video.videoWidth || 1280;
+          canvas.height = el.video.videoHeight || 720;
+          resetState(true);
+          el.startScanBtn.disabled = false;
+          updateStatus('摄像头已打开，可以开始接收');
+        } catch (err) {
+          console.error(err);
+          updateStatus(`打开摄像头失败：${err.message || err}`);
+        }
+      }
+
+      async function initDetector() {
+        if ('BarcodeDetector' in window) {
+          const formats = await BarcodeDetector.getSupportedFormats().catch(() => []);
+          if (formats.includes('qr_code')) {
+            detector = new BarcodeDetector({ formats: ['qr_code'] });
+            el.engineText.textContent = 'BarcodeDetector';
+            return;
+          }
+        }
+        throw new Error('当前环境不支持 BarcodeDetector。请使用较新的 Android Chrome。');
+      }
+
+      function parsePacket(raw) {
+        if (!raw || typeof raw !== 'string') return null;
+        if (raw[0] === 'M' && raw[1] === '|') {
+          const parts = raw.split('|');
+          if (parts.length !== 10) return null;
+          return {
+            type: 'meta',
+            id: parts[1],
+            name: base64UrlToText(parts[2]),
+            mime: base64UrlToText(parts[3]),
+            originalSize: b36ToInt(parts[4]),
+            payloadSize: b36ToInt(parts[5]),
+            totalChunks: b36ToInt(parts[6]),
+            chunkSize: b36ToInt(parts[7]),
+            compression: parts[8] === '1' ? 'gzip' : 'none',
+            fileCrc32: parts[9],
+          };
+        }
+        if (raw[0] === 'C' && raw[1] === '|') {
+          const p1 = raw.indexOf('|');
+          const p2 = raw.indexOf('|', p1 + 1);
+          const p3 = raw.indexOf('|', p2 + 1);
+          if (p1 < 0 || p2 < 0 || p3 < 0) return null;
+          return {
+            type: 'chunk',
+            id: raw.slice(p1 + 1, p2),
+            index: b36ToInt(raw.slice(p2 + 1, p3)),
+            data: fromBase64Url(raw.slice(p3 + 1)),
+          };
+        }
+        return null;
+      }
+
+      function sameFingerprint(str) {
+        const now = performance.now();
+        if (state.lastPacketFingerprint === str && now - state.lastScanAt < 120) return true;
+        state.lastPacketFingerprint = str; state.lastScanAt = now; return false;
+      }
+
+      function handleMeta(meta) {
+        if (!state.session) {
+          state.session = {
+            id: meta.id, name: meta.name, mime: meta.mime || 'application/octet-stream',
+            originalSize: meta.originalSize, payloadSize: meta.payloadSize, totalChunks: meta.totalChunks,
+            chunkSize: meta.chunkSize, compression: meta.compression, fileCrc32: meta.fileCrc32,
+          };
+          state.chunks.clear();
+          el.transferId.textContent = meta.id;
+          el.fileInfo.textContent = `${meta.name} · ${formatBytes(meta.originalSize)}` + (meta.payloadSize !== meta.originalSize ? ` · 载荷 ${formatBytes(meta.payloadSize)}` : '');
+          el.compressionInfo.textContent = meta.compression;
+          el.integrityText.textContent = '已锁定会话，等待分片';
+          updateStatus(`已锁定文件：${meta.name}`);
+          updateProgressUI();
+          return;
+        }
+        if (state.session.id === meta.id) {
+          updateStatus(`已锁定文件：${state.session.name}，继续补齐缺失分片`);
+          return;
+        }
+        updateStatus(`检测到新的传输 ${meta.id}，但当前会话未完成，已忽略`);
+      }
+
+      function handleChunk(packet) {
+        if (!state.session) return;
+        if (packet.id !== state.session.id) return;
+        if (!Number.isInteger(packet.index)) return;
+        if (packet.index < 0 || packet.index >= state.session.totalChunks) return;
+        if (state.chunks.has(packet.index)) return;
+        state.chunks.set(packet.index, packet.data);
+        updateProgressUI();
+        el.integrityText.textContent = `已接收 ${state.chunks.size}/${state.session.totalChunks}，等待收齐后做整文件校验`;
+        updateStatus(`接收中：${state.session.name}`);
+      }
+
+      function mergeChunks() {
+        const total = state.session.totalChunks;
+        let totalSize = 0;
+        for (let i = 0; i < total; i++) {
+          const part = state.chunks.get(i);
+          if (!part) throw new Error(`缺失分片 ${i}`);
+          totalSize += part.length;
+        }
+        const merged = new Uint8Array(totalSize);
+        let offset = 0;
+        for (let i = 0; i < total; i++) {
+          const part = state.chunks.get(i);
+          merged.set(part, offset);
+          offset += part.length;
+        }
+        return merged;
+      }
+
+      function downloadFile(bytes, name, mime) {
+        const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name || 'download.bin'; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function finalizeIfComplete() {
+        if (!state.session || state.chunks.size !== state.session.totalChunks) return;
+        try {
+          updateStatus('已收齐全部分片，正在拼接...');
+          let payload = mergeChunks();
+          let output = payload;
+          if (state.session.compression === 'gzip') {
+            if ('DecompressionStream' in window) {
+              const decompressed = await new Response(new Blob([payload]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+              output = new Uint8Array(decompressed);
+            } else {
+              throw new Error('当前环境不支持 gzip 解压，请让发送端关闭压缩');
+            }
+          }
+          const finalCrc = crc32(output);
+          if (finalCrc !== state.session.fileCrc32) {
+            el.integrityText.textContent = `整体校验失败：期望 ${state.session.fileCrc32}，实际 ${finalCrc}`;
+            updateStatus('整体校验失败，请继续扫描或让发送端调大帧间隔');
+            return;
+          }
+          el.integrityText.innerHTML = '<span class="ok">整体校验通过</span>';
+          updateStatus('接收完成，开始下载');
+          downloadFile(output, state.session.name, state.session.mime);
+          stopScan();
+          updateStatus('接收完成，文件已下载');
+        } catch (err) {
+          console.error(err);
+          el.integrityText.textContent = `收尾失败：${err.message || err}`;
+          updateStatus('收尾失败，请继续扫描或重新开始');
+        }
+      }
+
+      async function detectOneFrame() {
+        ctx.drawImage(el.video, 0, 0, canvas.width, canvas.height);
+        const codes = await detector.detect(canvas);
+        if (!codes || !codes.length) return null;
+        const raw = codes[0].rawValue;
+        return (raw && typeof raw === 'string') ? raw : null;
+      }
+
+      async function startScan() {
+        if (!stream || !detector || scanLoopActive) return;
+        scanLoopActive = true; runId++; const myRunId = runId;
+        el.startScanBtn.disabled = true; el.stopScanBtn.disabled = false;
+        updateStatus('扫描中，请将二维码稳定置于画面中央');
+        while (scanLoopActive && myRunId === runId) {
+          try {
+            const raw = await detectOneFrame();
+            if (!raw) { await sleep(90); continue; }
+            if (sameFingerprint(raw)) { await sleep(80); continue; }
+            el.lastScanText.textContent = new Date().toLocaleTimeString();
+            const packet = parsePacket(raw);
+            if (!packet) { await sleep(70); continue; }
+            if (packet.type === 'meta') handleMeta(packet);
+            else if (packet.type === 'chunk') { handleChunk(packet); await finalizeIfComplete(); }
+            await sleep(40);
+          } catch (err) {
+            console.error(err);
+            updateStatus(`扫描异常：${err.message || err}`);
+            await sleep(150);
+          }
+        }
+      }
+
+      function stopScan() { scanLoopActive = false; el.stopScanBtn.disabled = true; el.startScanBtn.disabled = !stream; }
+
+      el.openCameraBtn.addEventListener('click', async () => { await openCamera(); await listCameras(); });
+      el.startScanBtn.addEventListener('click', startScan);
+      el.stopScanBtn.addEventListener('click', stopScan);
+      el.resetBtn.addEventListener('click', () => { stopScan(); resetState(!!stream); });
+      el.cameraSelect.addEventListener('change', async () => { if (stream) { stopScan(); await openCamera(); } });
+
+      (async () => {
+        el.modeText.textContent = window.matchMedia('(display-mode: standalone)').matches ? '已安装 PWA' : '浏览器 / 可安装';
+        await registerServiceWorker();
+        try { await initDetector(); }
+        catch (err) { console.error(err); el.engineText.textContent = '不可用'; updateStatus(err.message || String(err)); }
+        if (navigator.mediaDevices?.addEventListener) navigator.mediaDevices.addEventListener('devicechange', listCameras);
+        await listCameras();
+      })();
+    })();
+  </script>
+</body>
+</html>
